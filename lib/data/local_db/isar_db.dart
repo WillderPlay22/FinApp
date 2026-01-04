@@ -1,7 +1,11 @@
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
+// Modelos de Ingresos (Antiguos)
 import '../models/transaction.dart';
 import '../models/recurring_movement.dart';
+// Modelos de Gastos (NUEVOS - Faltaban aquí)
+import '../models/category.dart';
+import '../models/expense.dart';
 
 class IsarService {
   late Future<Isar> db;
@@ -17,7 +21,13 @@ class IsarService {
       final dir = await getApplicationDocumentsDirectory();
       
       return await Isar.open(
-        [FinancialTransactionSchema, RecurringMovementSchema], // Registramos los esquemas
+        [
+          FinancialTransactionSchema, 
+          RecurringMovementSchema,
+          // AGREGAMOS LOS NUEVOS ESQUEMAS AQUÍ:
+          CategorySchema,
+          ExpenseSchema,
+        ], 
         directory: dir.path,
         inspector: true, // Nos permite ver la BD mientras programamos
       );

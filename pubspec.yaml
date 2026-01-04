@@ -10,6 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # --- IDIOMAS (Requerido para el calendario en Español) ---
+  flutter_localizations:
+    sdk: flutter
+  
+  # CORRECCIÓN: Actualizado a 0.20.2 para solucionar el error de versión
+  intl: ^0.20.2
+
   # --- GESTIÓN DE ESTADO ---
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.5
@@ -27,7 +34,6 @@ dependencies:
   gap: ^3.0.0
 
   # --- UTILIDADES ---
-  intl: ^0.19.0
   uuid: ^4.3.3
 
 dev_dependencies:
@@ -39,7 +45,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   isar_generator: ^3.1.0+1
   
-  # --- LINTERS (Solo el básico de Flutter) ---
+  # --- LINTERS ---
   flutter_lints: ^3.0.0
 
 flutter:

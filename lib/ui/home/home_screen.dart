@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
-// 1. Importamos la nueva pantalla de Ingresos
+// 1. Importamos las pantallas de los módulos
 import '../income/income_screen.dart';
+import '../expenses/expenses_screen.dart'; // <--- NUEVA IMPORTACIÓN
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -54,13 +55,12 @@ class HomeScreen extends StatelessWidget {
                 crossAxisSpacing: 15,
                 childAspectRatio: 1.3,
                 children: [
-                  // --- BOTÓN INGRESOS (CON NAVEGACIÓN) ---
+                  // --- BOTÓN INGRESOS ---
                   _MenuCard(
                     title: "Ingresos", 
                     icon: FontAwesomeIcons.arrowTrendUp, 
                     color: Colors.green,
                     onTap: () {
-                      // 2. Aquí conectamos con la nueva pantalla
                       Navigator.push(
                         context, 
                         MaterialPageRoute(builder: (_) => const IncomeScreen())
@@ -68,13 +68,21 @@ class HomeScreen extends StatelessWidget {
                     },
                   ),
                   
-                  // --- OTROS BOTONES (Aún sin conectar) ---
+                  // --- BOTÓN GASTOS (AHORA CONECTADO) ---
                   _MenuCard(
                     title: "Gastos", 
                     icon: FontAwesomeIcons.arrowTrendDown, 
                     color: Colors.red,
-                    onTap: () {},
+                    onTap: () {
+                      // NAVEGACIÓN A LA PANTALLA DE GASTOS
+                      Navigator.push(
+                        context, 
+                        MaterialPageRoute(builder: (_) => const ExpensesScreen())
+                      );
+                    },
                   ),
+
+                  // --- OTROS BOTONES (Aún sin conectar) ---
                   _MenuCard(
                     title: "Análisis", 
                     icon: FontAwesomeIcons.chartPie, 

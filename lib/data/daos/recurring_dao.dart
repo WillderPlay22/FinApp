@@ -8,7 +8,7 @@ class RecurringDao {
 
   RecurringDao(this.isarService);
 
-  // Crear una nueva regla recurrente (Ej: Sueldo Quincenal)
+  // Crear una nueva regla recurrente
   Future<void> addRecurringMovement(RecurringMovement movement) async {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
@@ -34,7 +34,15 @@ class RecurringDao {
         .watch(fireImmediately: true);
   }
 
-  // Calcular cuánto dinero deberías recibir al mes (Proyección)
+  // --- MÉTODO AGREGADO (CORRECCIÓN) ---
+  // Necesario para el debug_time_warp.dart
+  Future<List<RecurringMovement>> getAllRecurringMovements() async {
+    final isar = await isarService.db;
+    return await isar.recurringMovements.where().findAll();
+  }
+  // ------------------------------------
+
+  // Proyección mensual
   Stream<double> watchProjectedMonthlyIncome() async* {
     final isar = await isarService.db;
     
@@ -44,42 +52,23 @@ class RecurringDao {
         .watch(fireImmediately: true)
         .map((movements) {
           double totalProjection = 0;
-
           for (var movement in movements) {
-            // CORRECCIÓN 1: Especificamos tipos explícitos <double> y (double sum, double item)
-            // para asegurar que Dart sepa que no son nulos.
             double baseAmount = movement.paymentAmounts?.fold<double>(
-              0.0, 
-              (double sum, double item) => sum + item
-            ) ?? 0.0;
+              0.0, (sum, item) => sum + item) ?? 0.0;
 
-            // Ajustamos según la frecuencia para tener un estimado mensual
             switch (movement.frequency) {
-              case Frequency.daily:
-                totalProjection += baseAmount * 30; // Aprox mes
-                break;
-              case Frequency.weekly:
-                totalProjection += baseAmount * 4; // Aprox mes
-                break;
-              case Frequency.biweekly:
-                // El baseAmount ya incluye la suma de los 2 pagos (15 y último)
-                totalProjection += baseAmount; 
-                break;
-              case Frequency.monthly:
-                totalProjection += baseAmount;
-                break;
-              // CORRECCIÓN 2: Agregamos 'default' para cubrir cualquier otro caso (como Frequency.none)
-              default:
-                break;
+              case Frequency.daily: totalProjection += baseAmount * 30; break;
+              case Frequency.weekly: totalProjection += baseAmount * 4; break;
+              case Frequency.biweekly: totalProjection += baseAmount; break;
+              case Frequency.monthly: totalProjection += baseAmount; break;
+              default: break;
             }
           }
           return totalProjection;
         });
   }
 
-  // ... (código anterior)
-
-  // NUEVO: Borrar una regla de ingreso fijo
+  // Borrar regla
   Future<void> deleteRecurringMovement(Id id) async {
     final isar = await isarService.db;
     await isar.writeTxn(() async {

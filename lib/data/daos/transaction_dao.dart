@@ -1,14 +1,14 @@
 import 'package:isar/isar.dart';
 import '../local_db/isar_db.dart';
 import '../models/transaction.dart';
-import '../models/enums.dart'; // <--- ESTA ES LA LÍNEA QUE FALTABA
+import '../models/enums.dart';
 
 class TransactionDao {
   final IsarService isarService;
 
   TransactionDao(this.isarService);
 
-  // Guardar una nueva transacción (Ingreso o Gasto)
+  // Guardar transacción
   Future<void> addTransaction(FinancialTransaction transaction) async {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
@@ -16,7 +16,25 @@ class TransactionDao {
     });
   }
 
-  // Leer todas las transacciones ordenadas por fecha (lo más nuevo primero)
+  // Verificar si ya existe un pago
+  Future<bool> isPaymentMade({
+    required int recurringId, 
+    required DateTime start, 
+    required DateTime end
+  }) async {
+    final isar = await isarService.db;
+    
+    final count = await isar.financialTransactions
+        .filter()
+        .parentRecurringIdEqualTo(recurringId)
+        .and()
+        .dateBetween(start, end)
+        .count();
+
+    return count > 0;
+  }
+
+  // Leer todas
   Future<List<FinancialTransaction>> getAllTransactions() async {
     final isar = await isarService.db;
     return await isar.financialTransactions
@@ -25,7 +43,7 @@ class TransactionDao {
         .findAll();
   }
 
-  // Escuchar cambios en tiempo real
+  // Escuchar cambios
   Stream<List<FinancialTransaction>> watchTransactions() async* {
     final isar = await isarService.db;
     yield* isar.financialTransactions
@@ -34,19 +52,16 @@ class TransactionDao {
         .watch(fireImmediately: true);
   }
 
-  // Escuchar el total de dinero ingresado en el MES ACTUAL
+  // Total Ingresos Mes
   Stream<double> watchTotalIncomeThisMonth() async* {
     final isar = await isarService.db;
-    
-    // Calculamos el inicio y fin del mes actual
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-    // Observamos cambios y sumamos
     yield* isar.financialTransactions
         .filter()
-        .typeEqualTo(TransactionType.income) // Ahora sí reconocerá esto
+        .typeEqualTo(TransactionType.income)
         .dateBetween(startOfMonth, endOfMonth)
         .watch(fireImmediately: true)
         .map((transactions) {
@@ -55,3 +70,4 @@ class TransactionDao {
         });
   }
 }
+// ⚠️ PROVIDER ELIMINADO AQUÍ (Ya está en database_providers.dart)

@@ -48,8 +48,13 @@ const FinancialTransactionSchema = CollectionSchema(
       name: r'note',
       type: IsarType.string,
     ),
-    r'type': PropertySchema(
+    r'parentRecurringId': PropertySchema(
       id: 6,
+      name: r'parentRecurringId',
+      type: IsarType.long,
+    ),
+    r'type': PropertySchema(
+      id: 7,
       name: r'type',
       type: IsarType.string,
       enumMap: _FinancialTransactiontypeEnumValueMap,
@@ -60,7 +65,34 @@ const FinancialTransactionSchema = CollectionSchema(
   deserialize: _financialTransactionDeserialize,
   deserializeProp: _financialTransactionDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'date': IndexSchema(
+      id: -7552997827385218417,
+      name: r'date',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'date',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'parentRecurringId': IndexSchema(
+      id: 6127313349986115284,
+      name: r'parentRecurringId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'parentRecurringId',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _financialTransactionGetId,
@@ -93,7 +125,8 @@ void _financialTransactionSerialize(
   writer.writeLong(offsets[3], object.colorValue);
   writer.writeDateTime(offsets[4], object.date);
   writer.writeString(offsets[5], object.note);
-  writer.writeString(offsets[6], object.type.name);
+  writer.writeLong(offsets[6], object.parentRecurringId);
+  writer.writeString(offsets[7], object.type.name);
 }
 
 FinancialTransaction _financialTransactionDeserialize(
@@ -110,8 +143,9 @@ FinancialTransaction _financialTransactionDeserialize(
   object.date = reader.readDateTime(offsets[4]);
   object.id = id;
   object.note = reader.readString(offsets[5]);
+  object.parentRecurringId = reader.readLongOrNull(offsets[6]);
   object.type = _FinancialTransactiontypeValueEnumMap[
-          reader.readStringOrNull(offsets[6])] ??
+          reader.readStringOrNull(offsets[7])] ??
       TransactionType.income;
   return object;
 }
@@ -136,6 +170,8 @@ P _financialTransactionDeserializeProp<P>(
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
+      return (reader.readLongOrNull(offset)) as P;
+    case 7:
       return (_FinancialTransactiontypeValueEnumMap[
               reader.readStringOrNull(offset)] ??
           TransactionType.income) as P;
@@ -173,6 +209,24 @@ extension FinancialTransactionQueryWhereSort
       anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhere>
+      anyDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'date'),
+      );
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhere>
+      anyParentRecurringId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'parentRecurringId'),
+      );
     });
   }
 }
@@ -242,6 +296,214 @@ extension FinancialTransactionQueryWhere
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      dateEqualTo(DateTime date) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'date',
+        value: [date],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      dateNotEqualTo(DateTime date) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [],
+              upper: [date],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [date],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [date],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [],
+              upper: [date],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      dateGreaterThan(
+    DateTime date, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [date],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      dateLessThan(
+    DateTime date, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [],
+        upper: [date],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      dateBetween(
+    DateTime lowerDate,
+    DateTime upperDate, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [lowerDate],
+        includeLower: includeLower,
+        upper: [upperDate],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'parentRecurringId',
+        value: [null],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'parentRecurringId',
+        lower: [null],
+        includeLower: false,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdEqualTo(int? parentRecurringId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'parentRecurringId',
+        value: [parentRecurringId],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdNotEqualTo(int? parentRecurringId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'parentRecurringId',
+              lower: [],
+              upper: [parentRecurringId],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'parentRecurringId',
+              lower: [parentRecurringId],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'parentRecurringId',
+              lower: [parentRecurringId],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'parentRecurringId',
+              lower: [],
+              upper: [parentRecurringId],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdGreaterThan(
+    int? parentRecurringId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'parentRecurringId',
+        lower: [parentRecurringId],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdLessThan(
+    int? parentRecurringId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'parentRecurringId',
+        lower: [],
+        upper: [parentRecurringId],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterWhereClause>
+      parentRecurringIdBetween(
+    int? lowerParentRecurringId,
+    int? upperParentRecurringId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'parentRecurringId',
+        lower: [lowerParentRecurringId],
+        includeLower: includeLower,
+        upper: [upperParentRecurringId],
         includeUpper: includeUpper,
       ));
     });
@@ -817,6 +1079,80 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'parentRecurringId',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'parentRecurringId',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'parentRecurringId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'parentRecurringId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'parentRecurringId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> parentRecurringIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'parentRecurringId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
       QAfterFilterCondition> typeEqualTo(
     TransactionType value, {
     bool caseSensitive = true,
@@ -1048,6 +1384,20 @@ extension FinancialTransactionQuerySortBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByParentRecurringId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parentRecurringId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByParentRecurringIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parentRecurringId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       sortByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1163,6 +1513,20 @@ extension FinancialTransactionQuerySortThenBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByParentRecurringId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parentRecurringId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByParentRecurringIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parentRecurringId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       thenByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1222,6 +1586,13 @@ extension FinancialTransactionQueryWhereDistinct
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByParentRecurringId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'parentRecurringId');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
       distinctByType({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'type', caseSensitive: caseSensitive);
@@ -1275,6 +1646,13 @@ extension FinancialTransactionQueryProperty on QueryBuilder<
   QueryBuilder<FinancialTransaction, String, QQueryOperations> noteProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'note');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, int?, QQueryOperations>
+      parentRecurringIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'parentRecurringId');
     });
   }
 

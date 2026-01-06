@@ -11,8 +11,9 @@ import 'create_category_modal.dart';
 
 class AddExpenseModal extends ConsumerStatefulWidget {
   final Expense? expenseToEdit; 
+  final Category? preSelectedCategory; // ✅ NUEVO: Para pre-llenar categoría
 
-  const AddExpenseModal({super.key, this.expenseToEdit});
+  const AddExpenseModal({super.key, this.expenseToEdit, this.preSelectedCategory});
 
   @override
   ConsumerState<AddExpenseModal> createState() => _AddExpenseModalState();
@@ -38,6 +39,13 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       _selectedFrequency = e.frequency;
       _selectedDate = e.date;
       _selectedCategory = e.category.value;
+    } else {
+      // Si venimos pre-seleccionados (desde el detalle de categoría)
+      if (widget.preSelectedCategory != null) {
+        _selectedCategory = widget.preSelectedCategory;
+        _isFixedExpense = true; // Asumimos que es fijo si viene de ahí
+        _selectedFrequency = _selectedCategory!.frequency ?? Frequency.monthly;
+      }
     }
   }
   
@@ -63,8 +71,9 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(isEditing ? "Editar Gasto" : "Registrar Gasto", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colors.primary)),
-              if (!isEditing)
+              Text(isEditing ? "Editar Item" : "Registrar Gasto", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colors.primary)),
+              // Si ya venimos con categoría preseleccionada, bloqueamos el switch
+              if (!isEditing && widget.preSelectedCategory == null)
                 Container(
                   decoration: BoxDecoration(color: colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
                   child: Row(
@@ -79,7 +88,13 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
           
           const Gap(20),
 
-          // MONTO
+          // 1. SI ES FIJO, LA CATEGORÍA VA PRIMERO
+          if (_isFixedExpense) ...[
+             _buildCategorySelector(colors),
+             const Gap(20),
+          ],
+
+          // 2. MONTO
           TextField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -95,12 +110,13 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
 
           const Gap(10),
 
-          // NOMBRE
+          // 3. NOMBRE DEL ITEM (Sub-gasto)
           TextField(
             controller: _noteController,
             textAlign: TextAlign.center,
             decoration: InputDecoration(
-              hintText: _isFixedExpense ? "Ej: Alquiler, Gym..." : "Ej: Desayuno, Uber...",
+              // Cambiamos el placeholder para que entienda que es un item
+              hintText: _isFixedExpense ? "Nombre del Item (Ej: Carne, Gas...)" : "Ej: Desayuno, Uber...",
               filled: true,
               fillColor: colors.surfaceContainerHighest.withOpacity(0.3),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
@@ -109,18 +125,15 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
 
           const Gap(20),
 
-          // FECHA / FRECUENCIA
-          if (!_isFixedExpense) 
-            _buildDatePicker(colors)
-          else 
-            _buildFrequencySelector(colors),
-            
-          const Gap(20),
-
-          // CATEGORÍAS
-          _buildCategorySelector(colors),
-
-          const Gap(20),
+          // 4. SI NO ES FIJO, MOSTRAMOS FECHA Y CATEGORÍA ABAJO
+          if (!_isFixedExpense) ...[
+            _buildDatePicker(colors),
+            const Gap(20),
+            _buildCategorySelector(colors),
+            const Gap(20),
+          ],
+          
+          // NOTA: Si es fijo, ocultamos fecha y frecuencia, ya que las hereda de la Categoría.
 
           // BOTÓN GUARDAR
           SizedBox(
@@ -133,27 +146,26 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
-              child: Text(isEditing ? "Guardar Cambios" : "Registrar Gasto", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Text(isEditing ? "Guardar Cambios" : "Agregar Item", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
-
-          // ✅ BOTÓN ELIMINAR (Confirmado)
-          if (isEditing) ...[
+          
+          // ... (Botón eliminar igual que antes)
+           if (isEditing) ...[
             const Gap(10),
             TextButton.icon(
               onPressed: _deleteExpense,
               icon: const Icon(Icons.delete, color: Colors.red),
-              label: const Text("Eliminar este Gasto", style: TextStyle(color: Colors.red)),
+              label: const Text("Eliminar este Item", style: TextStyle(color: Colors.red)),
             )
           ],
-          
           const Gap(20),
         ],
       ),
     );
   }
 
-  // --- Widgets Auxiliares ---
+  // ... (Widgets auxiliares: _buildTypeButton, _buildDatePicker igual que antes)
   Widget _buildTypeButton(String text, bool isFixed) {
     final isSelected = _isFixedExpense == isFixed;
     return GestureDetector(
@@ -169,8 +181,8 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       ),
     );
   }
-
-  Widget _buildDatePicker(ColorScheme colors) {
+  
+   Widget _buildDatePicker(ColorScheme colors) {
     return GestureDetector(
       onTap: _pickDate,
       child: Container(
@@ -188,40 +200,19 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       ),
     );
   }
-
-  Widget _buildFrequencySelector(ColorScheme colors) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(border: Border.all(color: colors.outlineVariant), borderRadius: BorderRadius.circular(12)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<Frequency>(
-          value: _selectedFrequency,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down),
-          items: [Frequency.weekly, Frequency.biweekly, Frequency.monthly].map((Frequency freq) {
-            String label = "";
-            switch (freq) {
-              case Frequency.weekly: label = "Semanal"; break;
-              case Frequency.biweekly: label = "Quincenal"; break;
-              case Frequency.monthly: label = "Mensual"; break;
-              default: label = "";
-            }
-            return DropdownMenuItem(value: freq, child: Text(label));
-          }).toList(),
-          onChanged: (Frequency? newValue) {
-            if (newValue != null) setState(() => _selectedFrequency = newValue);
-          },
-        ),
-      ),
-    );
+  
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030), locale: const Locale('es', 'ES'));
+    if (picked != null) setState(() => _selectedDate = picked);
   }
+
 
   Widget _buildCategorySelector(ColorScheme colors) {
     final categoryDao = ref.watch(categoryDaoProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Selecciona Categoría:", style: TextStyle(fontWeight: FontWeight.bold, color: colors.outline)),
+        Text(_isFixedExpense ? "Pertenece a la Categoría:" : "Selecciona Categoría:", style: TextStyle(fontWeight: FontWeight.bold, color: colors.outline)),
         const Gap(10),
         SizedBox(
           height: 100,
@@ -229,6 +220,11 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             stream: categoryDao.watchExpenseCategories(),
             builder: (context, snapshot) {
               final categories = snapshot.data ?? [];
+              
+              // SI ES GASTO FIJO, FILTRAMOS SOLO CATEGORÍAS CON FRECUENCIA ASIGNADA (Opcional, pero buena práctica)
+              // final filtered = _isFixedExpense ? categories.where((c) => c.frequency != null).toList() : categories;
+              // Usamos todas por ahora para evitar errores si el usuario no ha puesto frecuencia
+              
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: categories.length + 1,
@@ -237,8 +233,20 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                   if (index == categories.length) return _buildAddCategoryButton(colors);
                   final category = categories[index];
                   final isSelected = _selectedCategory?.id == category.id;
+                  
+                  // Si estamos en modo Fijo, mostrar la frecuencia en la tarjeta
+                  final showFreq = _isFixedExpense && category.frequency != null;
+
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = category),
+                    onTap: () {
+                      setState(() {
+                        _selectedCategory = category;
+                        // Si es fijo, el gasto hereda la frecuencia de la categoría
+                        if (_isFixedExpense && category.frequency != null) {
+                          _selectedFrequency = category.frequency!;
+                        }
+                      });
+                    },
                     child: Column(
                       children: [
                         Container(
@@ -256,6 +264,8 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                         ),
                         const Gap(5),
                         Text(category.name, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        if (showFreq) 
+                          Text(category.frequency.toString().split('.').last, style: const TextStyle(fontSize: 8, color: Colors.blueGrey)),
                       ],
                     ),
                   );
@@ -287,11 +297,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
     );
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030), locale: const Locale('es', 'ES'));
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
-
   void _saveExpense() {
     if (_amountController.text.isEmpty || _noteController.text.isEmpty || _selectedCategory == null) return;
     final amount = double.tryParse(_amountController.text);
@@ -304,19 +309,19 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       date: _selectedDate,
       category: _selectedCategory!,
       isFixed: _isFixedExpense,
-      frequency: _selectedFrequency,
+      // Si es fijo, usamos la frecuencia de la categoría, si no, mensual por defecto
+      frequency: _isFixedExpense ? (_selectedCategory!.frequency ?? Frequency.monthly) : Frequency.monthly,
     );
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guardado correctamente")));
   }
-
-  // ✅ FUNCIONALIDAD DE ELIMINAR CORREGIDA
-  void _deleteExpense() async {
+  
+   void _deleteExpense() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("¿Eliminar gasto?"),
-        content: const Text("Esto eliminará la planificación futura, pero el historial de pagos realizados se mantendrá."),
+        content: const Text("Se borrará este item y su historial."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Eliminar", style: TextStyle(color: Colors.red))),
@@ -325,12 +330,10 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
     );
 
     if (confirm == true && widget.expenseToEdit != null) {
-      // Usamos el DAO para borrar
       await ref.read(expenseDaoProvider).deleteExpense(widget.expenseToEdit!.id);
-      
       if (context.mounted) {
-        Navigator.pop(context); // Cerrar el modal
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gasto eliminado")));
+        Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item eliminado")));
       }
     }
   }

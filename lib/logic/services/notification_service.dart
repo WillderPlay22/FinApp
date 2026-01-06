@@ -1,16 +1,55 @@
 import 'dart:async';
 import 'dart:io';
-// 1. Solo dejamos los imports necesarios
+import 'dart:ui'; 
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:isar/isar.dart';
+import 'package:intl/intl.dart'; 
+// ✅ IMPORTANTE: Necesario para que funcione el formato de fechas en background
+import 'package:intl/date_symbol_data_local.dart'; 
 
+import '../../data/local_db/isar_db.dart';
 import '../../data/models/recurring_movement.dart';
+import '../../data/models/transaction.dart';
 import '../../data/models/enums.dart';
 
+// 🛑 MANEJADOR BACKGROUND (App Cerrada)
 @pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse notificationResponse) async {
-  // Lógica de background (si la implementas a futuro)
+void notificationTapBackground(NotificationResponse response) async {
+  print("🛑 BACKGROUND START: Acción -> ${response.actionId}");
+
+  try {
+    // 1. Inicialización de Flutter
+    WidgetsFlutterBinding.ensureInitialized();
+    DartPluginRegistrant.ensureInitialized(); 
+
+    // 2. 🔥 ARREGLO DEL CRASH: Inicializar datos de fecha (Español)
+    // Sin esto, DateFormat falla en el hilo secundario
+    await initializeDateFormatting('es', null);
+
+    // 3. Configurar Timezone
+    tz.initializeTimeZones();
+    try { tz.setLocalLocation(tz.getLocation('America/Caracas')); } catch (_) { try { tz.setLocalLocation(tz.UTC); } catch (_) {} }
+
+    // 4. Inicializar Plugin
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await flutterLocalNotificationsPlugin.initialize(const InitializationSettings(android: initializationSettingsAndroid));
+    
+    // 5. Abrir Base de Datos
+    final isarService = IsarService();
+    final db = await isarService.openDB();
+    
+    // 6. Ejecutar Lógica
+    final service = NotificationService(); 
+    await service._handleActionLogic(db, response.actionId, response.payload);
+
+  } catch (e, stackTrace) {
+    print("❌ ERROR CRÍTICO EN BACKGROUND: $e");
+    print("Stacktrace: $stackTrace");
+  }
 }
 
 class NotificationService {
@@ -22,79 +61,187 @@ class NotificationService {
   final StreamController<String?> selectNotificationStream = StreamController<String?>.broadcast();
 
   Future<void> init() async {
+    // También inicializamos aquí por si acaso se llama directo
+    await initializeDateFormatting('es', null);
+    
     tz.initializeTimeZones();
-    try {
-      tz.setLocalLocation(tz.local); 
-    } catch (e) {
-      // Fallback si falla la detección automática
-    }
+    try { tz.setLocalLocation(tz.getLocation('America/Caracas')); } catch (_) { try { tz.setLocalLocation(tz.UTC); } catch (_) {} }
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
-
     await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.payload != null) {
-          selectNotificationStream.add(response.payload);
+      const InitializationSettings(android: initializationSettingsAndroid),
+      onDidReceiveNotificationResponse: (response) async {
+        print("🔔 FOREGROUND EVENT: ${response.actionId}");
+        
+        if (response.actionId == 'action_pay_yes' || response.actionId == 'action_postpone') {
+           try {
+             final isarService = IsarService();
+             final db = await isarService.db; 
+             await _handleActionLogic(db, response.actionId, response.payload);
+           } catch (e) {
+             print("❌ Error en lógica foreground: $e");
+           }
+        } else {
+           selectNotificationStream.add(response.payload);
         }
       },
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
     if (Platform.isAndroid) {
-      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+      final androidImp = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-
-      await androidImplementation?.requestNotificationsPermission();
-      await androidImplementation?.requestExactAlarmsPermission();
+      await androidImp?.requestNotificationsPermission();
+      await androidImp?.requestExactAlarmsPermission();
     }
   }
 
-  Future<void> scheduleAllNotifications(List<RecurringMovement> incomes) async {
-    await flutterLocalNotificationsPlugin.cancelAll();
+  // --- LÓGICA CENTRAL ---
+  Future<void> _handleActionLogic(Isar db, String? actionId, String? payload) async {
+    if (payload == null) return;
+    
+    final parts = payload.split('|');
+    final incomeId = int.parse(parts[0]);
+    final income = await db.recurringMovements.get(incomeId);
 
-    for (var income in incomes) {
-      final tz.TZDateTime? nextDate = _calculateNextPaymentDate(income);
-      
-      if (nextDate != null) {
-        double amount = 0.0;
-        if (income.frequency == Frequency.biweekly && nextDate.day > 15) {
-           amount = (income.paymentAmounts?.length ?? 0) > 1 
-              ? income.paymentAmounts![1] 
-              : ((income.paymentAmounts?.isNotEmpty ?? false) ? income.paymentAmounts![0] : 0.0);
-        } else {
-           amount = (income.paymentAmounts?.isNotEmpty == true) ? income.paymentAmounts![0] : 0.0;
-        }
-
-        final payload = "${income.id}|${nextDate.toIso8601String()}";
-
-        await _scheduleZoneNotification(
-          id: income.id,
-          title: "💰 ¡Hora de cobrar: ${income.title}!",
-          body: "Toca para registrar el pago de \$${amount.toStringAsFixed(2)}",
-          scheduledDate: nextDate,
-          payload: payload
-        );
-      }
+    if (income == null) {
+      print("⚠️ Ingreso ID $incomeId no encontrado.");
+      return;
     }
+
+    // Recuperar fecha programada para saber el monto exacto
+    DateTime targetDate;
+    if (parts.length > 1) {
+      try {
+        targetDate = DateTime.parse(parts[1]);
+      } catch (_) {
+        targetDate = _calculateNextPaymentDate(income)?.toDateTime() ?? DateTime.now();
+      }
+    } else {
+       targetDate = _calculateNextPaymentDate(income)?.toDateTime() ?? DateTime.now();
+    }
+
+    if (actionId == 'action_pay_yes') {
+      print("✅ PROCESANDO PAGO AUTOMÁTICO: ${income.title}");
+      await _processPayment(db, income, targetDate);
+    
+    } else if (actionId == 'action_postpone') {
+      print("💤 POSPONIENDO: ${income.title}");
+      await _postponeNotification(income);
+    }
+  }
+
+  Future<void> _processPayment(Isar db, RecurringMovement income, DateTime targetDate) async {
+    final now = DateTime.now();
+    
+    // Usamos targetDate (la fecha de la notificación) para determinar si es quincena 1 o 2
+    double amount = _getAmountForDate(income, tz.TZDateTime.from(targetDate, tz.local));
+
+    // Esto era lo que causaba el crash antes (ya arreglado con initializeDateFormatting)
+    String noteText = _generateNoteText(income, targetDate);
+
+    final newTx = FinancialTransaction()
+      ..amount = amount
+      ..note = noteText
+      ..date = now 
+      ..type = TransactionType.income
+      ..categoryName = income.title 
+      ..categoryIconCode = 0xf0d6
+      ..colorValue = 0xFF4CAF50
+      ..parentRecurringId = income.id;
+
+    await db.writeTxn(() async {
+      await db.financialTransactions.put(newTx);
+    });
+    
+    print("✅ Transacción GUARDADA: \$$amount. Nota: $noteText");
+    
+    await _scheduleNextForIncome(income);
+  }
+
+  Future<void> _postponeNotification(RecurringMovement income) async {
+    final now = tz.TZDateTime.now(tz.local);
+    final tomorrow = now.add(const Duration(days: 1));
+    final tomorrow7pm = tz.TZDateTime(tz.local, tomorrow.year, tomorrow.month, tomorrow.day, 19, 0, 0);
+    
+    final payload = "${income.id}|${tomorrow7pm.toIso8601String()}";
+    
+    await _scheduleZoneNotification(
+      id: income.id,
+      title: "⏰ Recordatorio: ${income.title}",
+      body: "Pospusiste este cobro. ¿Ya lo recibiste?",
+      scheduledDate: tomorrow7pm,
+      payload: payload
+    );
+  }
+
+  Future<void> scheduleAllNotifications(List<RecurringMovement> incomes) async {
+    await flutterLocalNotificationsPlugin.cancelAll(); 
+    print("🔄 Reprogramando ${incomes.length} alarmas limpias...");
+    
+    for (var income in incomes) {
+      await _scheduleNextForIncome(income);
+    }
+  }
+
+  Future<void> _scheduleNextForIncome(RecurringMovement income) async {
+    final tz.TZDateTime? nextDate = _calculateNextPaymentDate(income);
+    
+    if (nextDate != null) {
+      double amount = _getAmountForDate(income, nextDate);
+      
+      final payload = "${income.id}|${nextDate.toIso8601String()}";
+      print("📅 Alarma: ${income.title} -> $nextDate (Monto: $amount)");
+
+      await _scheduleZoneNotification(
+        id: income.id,
+        title: "¡💰 Ha llegado tu pago de ${income.title}!",
+        body: "¿Recibiste los \$${amount.toStringAsFixed(2)}? Toca para opciones.",
+        scheduledDate: nextDate,
+        payload: payload
+      );
+    }
+  }
+
+  // --- LÓGICA DE NEGOCIO ---
+
+  double _getAmountForDate(RecurringMovement income, tz.TZDateTime date) {
+    if (income.frequency == Frequency.biweekly) {
+      // Si el día de la notificación era > 15, paga el 2do monto
+      if (date.day > 15) {
+        if ((income.paymentAmounts?.length ?? 0) > 1) {
+          return income.paymentAmounts![1];
+        }
+      }
+      return (income.paymentAmounts?.isNotEmpty == true) ? income.paymentAmounts![0] : 0.0;
+    }
+    return (income.paymentAmounts?.isNotEmpty == true) ? income.paymentAmounts![0] : 0.0;
+  }
+
+  String _generateNoteText(RecurringMovement income, DateTime date) {
+    if (income.frequency == Frequency.biweekly) {
+      if (date.day > 15) {
+        return "Cobro: 2ª Quincena (${DateFormat('MMM', 'es').format(date)})";
+      } else {
+        return "Cobro: 1ª Quincena (${DateFormat('MMM', 'es').format(date)})";
+      }
+    } else if (income.frequency == Frequency.monthly) {
+        return "Cobro: Mes de ${DateFormat('MMMM', 'es').format(date)}";
+    }
+    return "Cobro Automático: ${income.title}";
   }
 
   tz.TZDateTime? _calculateNextPaymentDate(RecurringMovement income) {
     final now = tz.TZDateTime.now(tz.local);
-    // 9:00 AM
-    tz.TZDateTime candidateDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0, 0);
+    tz.TZDateTime candidateDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 19, 0, 0);
 
     if (now.isAfter(candidateDate)) {
       candidateDate = candidateDate.add(const Duration(days: 1));
     }
 
-    for (int i = 0; i < 45; i++) {
+    for (int i = 0; i < 60; i++) {
       if (_matchesFrequency(income, candidateDate)) {
         return candidateDate;
       }
@@ -129,11 +276,15 @@ class NotificationService {
     required String payload,
   }) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'finapp_channel_id', 'Recordatorios de Pago',
-      channelDescription: 'Avisos para registrar tus ingresos',
+      'finapp_channel_prod', 
+      'Recordatorios de Ingresos',
+      channelDescription: 'Canal principal de cobros',
       importance: Importance.max, priority: Priority.high,
+      playSound: true, enableVibration: true, fullScreenIntent: true,
       actions: <AndroidNotificationAction>[
-        AndroidNotificationAction('action_open', 'Registrar Ahora', showsUserInterface: true),
+        AndroidNotificationAction('action_pay_yes', 'Sí, Cobrar', showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction('action_edit', 'Otro Monto', showsUserInterface: true, cancelNotification: true),
+        AndroidNotificationAction('action_postpone', 'Aún no', showsUserInterface: false, cancelNotification: true),
       ],
     );
 
@@ -141,9 +292,12 @@ class NotificationService {
       id, title, body, scheduledDate,
       const NotificationDetails(android: androidDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,
-      matchDateTimeComponents: DateTimeComponents.time,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
+}
+
+extension TZConvert on tz.TZDateTime {
+  DateTime toDateTime() => DateTime(year, month, day, hour, minute, second);
 }

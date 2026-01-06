@@ -41,7 +41,7 @@ class ExpenseHistoryList extends ConsumerWidget {
           itemBuilder: (context, index) {
             final tx = transactions[index];
             
-            // ✅ ENVUELTO EN DISMISSIBLE PARA BORRAR DESLIZANDO
+            // ✅ DISMISSIBLE PARA BORRAR DESLIZANDO (ÚNICA ACCIÓN PERMITIDA)
             return Dismissible(
               key: Key(tx.id.toString()),
               direction: DismissDirection.endToStart,
@@ -58,8 +58,8 @@ class ExpenseHistoryList extends ConsumerWidget {
                 return await showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text("¿Borrar transacción?"),
-                    content: const Text("Esta acción no se puede deshacer."),
+                    title: const Text("¿Borrar del historial?"),
+                    content: const Text("Esta acción eliminará el registro de este pago para siempre."),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
                       TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Borrar", style: TextStyle(color: Colors.red))),
@@ -97,6 +97,7 @@ class _ExpenseHistoryItem extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Icono de la categoría
           Container(
             width: 45, height: 45,
             decoration: BoxDecoration(
@@ -112,24 +113,50 @@ class _ExpenseHistoryItem extends StatelessWidget {
           
           const Gap(12),
 
+          // Textos centrales
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 1. Nombre del pago (Nota)
                 Text(
                   transaction.note,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  DateFormat('dd MMM yyyy - HH:mm', 'es').format(transaction.date),
-                  style: TextStyle(fontSize: 10, color: colors.outline),
+                
+                // 2. Fecha y Categoría
+                Row(
+                  children: [
+                    Text(
+                      DateFormat('dd MMM - HH:mm', 'es').format(transaction.date),
+                      style: TextStyle(fontSize: 11, color: colors.outline),
+                    ),
+                    // Separador
+                    Text(" • ", style: TextStyle(fontSize: 11, color: colors.outline)),
+                    
+                    // Nombre de la Categoría
+                    Expanded(
+                      child: Text(
+                        // ✅ CORREGIDO: Se elimina el '??' porque categoryName no es nulo
+                        transaction.categoryName, 
+                        style: TextStyle(
+                          fontSize: 11, 
+                          color: colors.primary.withOpacity(0.8), 
+                          fontWeight: FontWeight.w600
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
+          // Monto a la derecha
           Text(
             "- \$${transaction.amount.toStringAsFixed(2)}",
             style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.red, fontSize: 16),

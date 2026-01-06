@@ -4,11 +4,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'; 
 import 'package:isar/isar.dart';
 
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+
 import 'config/theme/app_theme.dart';
 import 'ui/home/home_screen.dart';
 import 'data/local_db/isar_db.dart';
 import 'logic/services/category_seeder.dart';
-import 'logic/services/notification_service.dart'; // Importar servicio
+import 'logic/services/notification_service.dart'; 
 import 'ui/income/modals/recurring_detail_modal.dart';
 import 'data/models/recurring_movement.dart'; 
 
@@ -29,6 +32,31 @@ Future<void> main() async {
   final isar = await isarService.db;
   final allIncomes = await isar.recurringMovements.where().findAll();
   await NotificationService().scheduleAllNotifications(allIncomes);
+
+  // 🕵️‍♂️ --- INICIO DEL DIAGNÓSTICO --- 🕵️‍♂️
+  print("\n🔵 ================= DIAGNÓSTICO DE NOTIFICACIONES =================");
+  
+  // A. Ver la hora exacta y zona horaria que detecta la app
+  final now = tz.TZDateTime.now(tz.local);
+  print("⌚ Hora actual del sistema (Timezone): $now");
+  print("🌍 Zona Horaria detectada: ${tz.local.name}");
+
+  // B. Consultar al sistema Android cuántas alarmas hay realmente
+  final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final List<PendingNotificationRequest> pending = 
+      await flutterLocalNotificationsPlugin.pendingNotificationRequests();
+  
+  if (pending.isEmpty) {
+    print("❌ ALERTA: La lista de notificaciones pendientes está VACÍA.");
+    print("   Posible causa: La lógica de fechas falló o Android bloqueó la programación.");
+  } else {
+    print("✅ ESTADO OK: Hay ${pending.length} notificaciones en cola:");
+    for (var p in pending) {
+      print("   ➡ ID: ${p.id} | Título: ${p.title} | Payload: ${p.payload}");
+    }
+  }
+  print("🔵 ================= FIN DEL DIAGNÓSTICO ==========================\n");
+  // -----------------------------------------------------------------------
 
   runApp(const ProviderScope(child: MainApp()));
 }

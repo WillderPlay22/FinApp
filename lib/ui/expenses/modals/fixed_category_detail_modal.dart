@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import '../../../data/models/expense.dart';
-import '../../../logic/models/category_with_expenses.dart';
+// ✅ Asegúrate de que este import coincida con la ruta del archivo que creaste en el paso A
+import '../../../logic/models/category_with_expenses.dart'; 
 import '../../../logic/providers/database_providers.dart';
 import '../../../data/daos/expense_dao.dart';
-import 'add_expense_modal.dart'; // Para editar gastos individuales
+import 'add_expense_modal.dart';
 
 class FixedCategoryDetailModal extends ConsumerWidget {
   final CategoryWithExpenses data;
@@ -50,13 +51,6 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // BOTÓN EDITAR CATEGORÍA (Opcional)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () {
-                    // Aquí podrías abrir CreateCategoryModal en modo edición
-                  },
-                )
               ],
             ),
           ),
@@ -81,7 +75,6 @@ class FixedCategoryDetailModal extends ConsumerWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Abrir modal de agregar gasto PRE-SELECCIONANDO esta categoría
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
@@ -103,7 +96,10 @@ class FixedCategoryDetailModal extends ConsumerWidget {
     );
   }
 
-  String _getFrequencyLabel(dynamic freq) => freq.toString().split('.').last.toUpperCase();
+  String _getFrequencyLabel(dynamic freq) {
+    if (freq == null) return "MENSUAL";
+    return freq.toString().split('.').last.toUpperCase();
+  }
 }
 
 class _ExpenseChildItem extends StatelessWidget {
@@ -116,7 +112,6 @@ class _ExpenseChildItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    // Stream individual para ver si ESTE item específico ya se pagó
     return StreamBuilder<CycleStatus>(
       stream: expenseDao.watchCycleStatus(expense),
       builder: (context, snapshot) {
@@ -125,7 +120,6 @@ class _ExpenseChildItem extends StatelessWidget {
 
         return InkWell(
           onTap: () {
-            // Editar el item individual
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -150,8 +144,6 @@ class _ExpenseChildItem extends StatelessWidget {
                     ],
                   ),
                 ),
-                
-                // BOTÓN DE PAGO RÁPIDO
                 if (!isPaid)
                   IconButton(
                     icon: const Icon(Icons.check_circle_outline, size: 28),

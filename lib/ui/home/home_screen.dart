@@ -13,7 +13,7 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.surface,
-      // ✅ AppBar Limpio: Solo título, sin botón de debug
+      // ✅ AppBar Original y Limpio
       appBar: AppBar(
         backgroundColor: colors.surface,
         elevation: 0,
@@ -31,10 +31,16 @@ class HomeScreen extends StatelessWidget {
               _BalanceHeader(colors: colors),
               const Gap(20),
 
+              // Botón Original (Placeholder para futura IA o análisis)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Acción futura (ej: Análisis con IA)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Próximamente: Análisis Inteligente"))
+                    );
+                  },
                   icon: const Icon(FontAwesomeIcons.robot, color: Colors.white),
                   label: const Text("¿Puedo comprarlo?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
@@ -46,6 +52,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const Gap(20),
 
+              // Menú Principal
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -71,17 +78,17 @@ class HomeScreen extends StatelessWidget {
                     title: "Análisis", 
                     icon: FontAwesomeIcons.chartPie, 
                     color: Colors.blue, 
-                    onTap: () {}
+                    onTap: () {} 
                   ),
                   _MenuCard(
                     title: "Metas", 
                     icon: FontAwesomeIcons.bullseye, 
                     color: Colors.orange, 
-                    onTap: () {}
+                    onTap: () {} 
                   ),
                 ],
               ),
-              const Gap(80),
+              const Gap(80), // Espacio para FAB
             ],
           ),
         ),

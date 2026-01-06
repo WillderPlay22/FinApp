@@ -27,13 +27,19 @@ const ExpenseSchema = CollectionSchema(
       name: r'date',
       type: IsarType.dateTime,
     ),
-    r'isRecurring': PropertySchema(
+    r'frequency': PropertySchema(
       id: 2,
+      name: r'frequency',
+      type: IsarType.string,
+      enumMap: _ExpensefrequencyEnumValueMap,
+    ),
+    r'isRecurring': PropertySchema(
+      id: 3,
       name: r'isRecurring',
       type: IsarType.bool,
     ),
     r'title': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'title',
       type: IsarType.string,
     )
@@ -65,6 +71,7 @@ int _expenseEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.frequency.name.length * 3;
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -77,8 +84,9 @@ void _expenseSerialize(
 ) {
   writer.writeDouble(offsets[0], object.amount);
   writer.writeDateTime(offsets[1], object.date);
-  writer.writeBool(offsets[2], object.isRecurring);
-  writer.writeString(offsets[3], object.title);
+  writer.writeString(offsets[2], object.frequency.name);
+  writer.writeBool(offsets[3], object.isRecurring);
+  writer.writeString(offsets[4], object.title);
 }
 
 Expense _expenseDeserialize(
@@ -90,8 +98,11 @@ Expense _expenseDeserialize(
   final object = Expense(
     amount: reader.readDouble(offsets[0]),
     date: reader.readDateTime(offsets[1]),
-    isRecurring: reader.readBoolOrNull(offsets[2]) ?? false,
-    title: reader.readString(offsets[3]),
+    frequency:
+        _ExpensefrequencyValueEnumMap[reader.readStringOrNull(offsets[2])] ??
+            Frequency.monthly,
+    isRecurring: reader.readBoolOrNull(offsets[3]) ?? false,
+    title: reader.readString(offsets[4]),
   );
   object.id = id;
   return object;
@@ -109,13 +120,33 @@ P _expenseDeserializeProp<P>(
     case 1:
       return (reader.readDateTime(offset)) as P;
     case 2:
-      return (reader.readBoolOrNull(offset) ?? false) as P;
+      return (_ExpensefrequencyValueEnumMap[reader.readStringOrNull(offset)] ??
+          Frequency.monthly) as P;
     case 3:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 4:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
+
+const _ExpensefrequencyEnumValueMap = {
+  r'none': r'none',
+  r'daily': r'daily',
+  r'weekly': r'weekly',
+  r'biweekly': r'biweekly',
+  r'monthly': r'monthly',
+  r'yearly': r'yearly',
+};
+const _ExpensefrequencyValueEnumMap = {
+  r'none': Frequency.none,
+  r'daily': Frequency.daily,
+  r'weekly': Frequency.weekly,
+  r'biweekly': Frequency.biweekly,
+  r'monthly': Frequency.monthly,
+  r'yearly': Frequency.yearly,
+};
 
 Id _expenseGetId(Expense object) {
   return object.id;
@@ -318,6 +349,136 @@ extension ExpenseQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyEqualTo(
+    Frequency value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyGreaterThan(
+    Frequency value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyLessThan(
+    Frequency value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyBetween(
+    Frequency lower,
+    Frequency upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'frequency',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'frequency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'frequency',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'frequency',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> frequencyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'frequency',
+        value: '',
       ));
     });
   }
@@ -559,6 +720,18 @@ extension ExpenseQuerySortBy on QueryBuilder<Expense, Expense, QSortBy> {
     });
   }
 
+  QueryBuilder<Expense, Expense, QAfterSortBy> sortByFrequency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'frequency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> sortByFrequencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'frequency', Sort.desc);
+    });
+  }
+
   QueryBuilder<Expense, Expense, QAfterSortBy> sortByIsRecurring() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isRecurring', Sort.asc);
@@ -607,6 +780,18 @@ extension ExpenseQuerySortThenBy
   QueryBuilder<Expense, Expense, QAfterSortBy> thenByDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> thenByFrequency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'frequency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> thenByFrequencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'frequency', Sort.desc);
     });
   }
 
@@ -661,6 +846,13 @@ extension ExpenseQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Expense, Expense, QDistinct> distinctByFrequency(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'frequency', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Expense, Expense, QDistinct> distinctByIsRecurring() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isRecurring');
@@ -692,6 +884,12 @@ extension ExpenseQueryProperty
   QueryBuilder<Expense, DateTime, QQueryOperations> dateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'date');
+    });
+  }
+
+  QueryBuilder<Expense, Frequency, QQueryOperations> frequencyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'frequency');
     });
   }
 

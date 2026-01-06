@@ -1,94 +1,16 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter/foundation.dart'; 
-import 'dart:ui'; 
-import 'dart:io';
 import 'dart:async';
-import 'package:isar/isar.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart'; 
-// Alias solo para Timezone
+import 'dart:io';
+// 1. Solo dejamos los imports necesarios
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../../data/models/transaction.dart';
 import '../../data/models/recurring_movement.dart';
-import '../../data/models/category.dart';
-import '../../data/models/expense.dart';
 import '../../data/models/enums.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
-  DartPluginRegistrant.ensureInitialized();
-
-  if (notificationResponse.payload == null) return;
-
-  final parts = notificationResponse.payload!.split('|');
-  final int incomeId = int.parse(parts[0]);
-  final DateTime date = DateTime.parse(parts[1]);
-
-  if (notificationResponse.actionId == 'action_yes') {
-    await _processBackgroundPayment(incomeId, date);
-  } 
-}
-
-Future<void> _processBackgroundPayment(int id, DateTime date) async {
-  try {
-    final dir = await getApplicationDocumentsDirectory();
-    Isar isar;
-    if (Isar.instanceNames.isEmpty) {
-      isar = await Isar.open(
-        [FinancialTransactionSchema, RecurringMovementSchema, CategorySchema, ExpenseSchema],
-        directory: dir.path,
-        inspector: false,
-      );
-    } else {
-      isar = Isar.getInstance()!;
-    }
-
-    final income = await isar.recurringMovements.get(id);
-    
-    if (income != null) {
-      double amount = 0.0;
-      String note = "Cobro Recurrente";
-      final amounts = income.paymentAmounts ?? [];
-
-      if (income.frequency == Frequency.biweekly) {
-        final isFirstFortnight = date.day <= 15;
-        amount = isFirstFortnight 
-            ? (amounts.isNotEmpty ? amounts[0] : 0.0)
-            : (amounts.length > 1 ? amounts[1] : (amounts.isNotEmpty ? amounts[0] : 0.0));
-        note = isFirstFortnight ? "Cobro: 1ª Quincena (Día 15)" : "Cobro: 2ª Quincena (Fin de Mes)";
-      } else if (income.frequency == Frequency.monthly) {
-        amount = amounts.isNotEmpty ? amounts[0] : 0.0;
-        note = "Cobro: Mensualidad de ${DateFormat('MMMM', 'es').format(date)}";
-      } else if (income.frequency == Frequency.weekly) {
-        amount = amounts.isNotEmpty ? amounts[0] : 0.0;
-        final daysFromMonday = date.weekday - 1;
-        final monday = date.subtract(Duration(days: daysFromMonday));
-        note = "Cobro: Semana del ${monday.day} ${DateFormat('MMM', 'es').format(monday)}";
-      } else if (income.frequency == Frequency.daily) {
-        amount = amounts.isNotEmpty ? amounts[0] : 0.0;
-        note = "Cobro: Día ${DateFormat('dd/MM').format(date)}";
-      }
-
-      final newTx = FinancialTransaction()
-        ..amount = amount
-        ..note = note
-        ..date = date
-        ..type = TransactionType.income
-        ..categoryName = income.title
-        ..categoryIconCode = FontAwesomeIcons.sackDollar.codePoint
-        ..colorValue = 0xFF4CAF50 
-        ..parentRecurringId = income.id;
-
-      await isar.writeTxn(() async {
-        await isar.financialTransactions.put(newTx);
-      });
-    }
-  } catch (e) {
-    debugPrint("Error background: $e");
-  }
+  // Lógica de background (si la implementas a futuro)
 }
 
 class NotificationService {
@@ -101,6 +23,11 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
+    try {
+      tz.setLocalLocation(tz.local); 
+    } catch (e) {
+      // Fallback si falla la detección automática
+    }
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -112,7 +39,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.actionId == 'action_other') {
+        if (response.payload != null) {
           selectNotificationStream.add(response.payload);
         }
       },
@@ -125,6 +52,7 @@ class NotificationService {
               AndroidFlutterLocalNotificationsPlugin>();
 
       await androidImplementation?.requestNotificationsPermission();
+      await androidImplementation?.requestExactAlarmsPermission();
     }
   }
 
@@ -132,7 +60,8 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.cancelAll();
 
     for (var income in incomes) {
-      final nextDate = _calculateNextPaymentDate(income);
+      final tz.TZDateTime? nextDate = _calculateNextPaymentDate(income);
+      
       if (nextDate != null) {
         double amount = 0.0;
         if (income.frequency == Frequency.biweekly && nextDate.day > 15) {
@@ -147,8 +76,8 @@ class NotificationService {
 
         await _scheduleZoneNotification(
           id: income.id,
-          title: "💰 ¡Llegó tu pago: ${income.title}!",
-          body: "¿Recibiste los \$${amount.toStringAsFixed(2)}? Toca para confirmar.",
+          title: "💰 ¡Hora de cobrar: ${income.title}!",
+          body: "Toca para registrar el pago de \$${amount.toStringAsFixed(2)}",
           scheduledDate: nextDate,
           payload: payload
         );
@@ -156,99 +85,65 @@ class NotificationService {
     }
   }
 
-  DateTime? _calculateNextPaymentDate(RecurringMovement income) {
-    final now = DateTime.now();
-    // ✅ CAMBIO: Hora fijada a las 14:00 (2:00 PM)
-    final baseTime = DateTime(now.year, now.month, now.day, 14, 0, 0);
-    final searchStart = now.isAfter(baseTime) ? baseTime.add(const Duration(days: 1)) : baseTime;
+  tz.TZDateTime? _calculateNextPaymentDate(RecurringMovement income) {
+    final now = tz.TZDateTime.now(tz.local);
+    // 9:00 AM
+    tz.TZDateTime candidateDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0, 0);
 
-    DateTime? nextDate;
-
-    if (income.frequency == Frequency.daily) {
-      nextDate = searchStart;
-    } else if (income.frequency == Frequency.weekly) {
-      final userDay = (income.paymentDays?.isNotEmpty == true) ? income.paymentDays![0] : 1;
-      DateTime temp = searchStart;
-      while (temp.weekday != userDay) {
-        temp = temp.add(const Duration(days: 1));
-      }
-      nextDate = temp;
-    } else if (income.frequency == Frequency.monthly) {
-      final userDay = (income.paymentDays?.isNotEmpty == true) ? income.paymentDays![0] : 1;
-      DateTime temp = searchStart;
-      while (true) {
-        final lastDayOfMonth = DateTime(temp.year, temp.month + 1, 0).day;
-        final targetDay = (userDay > lastDayOfMonth) ? lastDayOfMonth : userDay;
-        if (temp.day == targetDay) {
-          nextDate = temp;
-          break;
-        }
-        temp = temp.add(const Duration(days: 1));
-        if (temp.day == targetDay) { nextDate = temp; break; } 
-      }
-    } else if (income.frequency == Frequency.biweekly) {
-      DateTime temp = searchStart;
-      while (true) {
-        final lastDay = DateTime(temp.year, temp.month + 1, 0).day;
-        if (temp.day == 15 || temp.day == lastDay) {
-          nextDate = temp;
-          break;
-        }
-        temp = temp.add(const Duration(days: 1));
-      }
+    if (now.isAfter(candidateDate)) {
+      candidateDate = candidateDate.add(const Duration(days: 1));
     }
-    return nextDate;
+
+    for (int i = 0; i < 45; i++) {
+      if (_matchesFrequency(income, candidateDate)) {
+        return candidateDate;
+      }
+      candidateDate = candidateDate.add(const Duration(days: 1));
+    }
+    return null;
+  }
+
+  bool _matchesFrequency(RecurringMovement income, DateTime date) {
+    switch (income.frequency) {
+      case Frequency.daily: return true;
+      case Frequency.weekly:
+        final userDay = (income.paymentDays?.isNotEmpty == true) ? income.paymentDays![0] : 1;
+        return date.weekday == userDay;
+      case Frequency.biweekly:
+        final lastDayOfMonth = DateTime(date.year, date.month + 1, 0).day;
+        return date.day == 15 || date.day == lastDayOfMonth;
+      case Frequency.monthly:
+        final userDay = (income.paymentDays?.isNotEmpty == true) ? income.paymentDays![0] : 1;
+        final lastDayOfMonth = DateTime(date.year, date.month + 1, 0).day;
+        final targetDay = (userDay > lastDayOfMonth) ? lastDayOfMonth : userDay;
+        return date.day == targetDay;
+      default: return false;
+    }
   }
 
   Future<void> _scheduleZoneNotification({
     required int id,
     required String title,
     required String body,
-    required DateTime scheduledDate,
+    required tz.TZDateTime scheduledDate,
     required String payload,
   }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'finapp_channel_id', 'Recordatorios de Pago', importance: Importance.max, priority: Priority.high,
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'finapp_channel_id', 'Recordatorios de Pago',
+      channelDescription: 'Avisos para registrar tus ingresos',
+      importance: Importance.max, priority: Priority.high,
       actions: <AndroidNotificationAction>[
-        AndroidNotificationAction('action_yes', 'Sí, Recibido', showsUserInterface: false, cancelNotification: true),
-        AndroidNotificationAction('action_other', 'Otro Monto', showsUserInterface: true, cancelNotification: true),
-        AndroidNotificationAction('action_snooze', 'Aún No', showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction('action_open', 'Registrar Ahora', showsUserInterface: true),
       ],
     );
 
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tz.TZDateTime.from(scheduledDate, tz.local),
-      const NotificationDetails(android: androidPlatformChannelSpecifics),
+      id, title, body, scheduledDate,
+      const NotificationDetails(android: androidDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,
-    );
-  }
-
-  Future<void> showActionNotification({
-    required int id,
-    required String title,
-    required String body,
-    required String payload, 
-  }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'finapp_channel_id', 'Recordatorios de Pago', importance: Importance.max, priority: Priority.high,
-      actions: <AndroidNotificationAction>[
-        AndroidNotificationAction('action_yes', 'Sí, Recibido', showsUserInterface: false, cancelNotification: true),
-        AndroidNotificationAction('action_other', 'Otro Monto', showsUserInterface: true, cancelNotification: true),
-        AndroidNotificationAction('action_snooze', 'Aún No', showsUserInterface: false, cancelNotification: true),
-      ],
-    );
-
-    await flutterLocalNotificationsPlugin.show(
-      id, title, body, 
-      const NotificationDetails(android: androidPlatformChannelSpecifics), 
-      payload: payload
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 }

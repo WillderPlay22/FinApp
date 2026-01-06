@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // IMPORTANTE
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
-// Importamos nuestros modelos, enums y proveedores
 import '../../../data/models/enums.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/recurring_movement.dart';
 import '../../../logic/providers/database_providers.dart';
+// ✅ IMPORTANTE: Conexión con notificaciones
+import '../../../logic/services/notification_service.dart';
 
-// CAMBIO 1: Ahora extendemos de ConsumerStatefulWidget para usar "ref"
 class AddIncomeModal extends ConsumerStatefulWidget {
   const AddIncomeModal({super.key});
 
@@ -94,9 +94,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             
             const Gap(20),
 
-            // --- BOTÓN GUARDAR CON LÓGICA ---
             ElevatedButton(
-              onPressed: _saveData, // Llamamos a la función de guardado
+              onPressed: _saveData,
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
                 foregroundColor: colors.onPrimary,
@@ -112,7 +111,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
   }
 
   // ===========================================================================
-  // LÓGICA DE GUARDADO (AQUÍ OCURRE LA MAGIA)
+  // LÓGICA DE GUARDADO (ACTUALIZADA CON NOTIFICACIONES)
   // ===========================================================================
   void _saveData() async {
     // 1. Validaciones básicas
@@ -124,31 +123,25 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         // --- GUARDAR INGRESO FIJO ---
         final recurringDao = ref.read(recurringDaoProvider);
         
-        // Preparamos las listas de días y montos
         List<int> paymentDays = [];
         List<double> paymentAmounts = [];
         double accumulated = 0;
 
         if (_selectedFrequency == Frequency.biweekly) {
-          // Quincenal: Día 15 y Día -1 (Último)
           paymentDays = [15, -1]; 
           final m15 = double.tryParse(_amount15Controller.text) ?? 0;
           final mLast = double.tryParse(_amountLastController.text) ?? 0;
           paymentAmounts = [m15, mLast];
         } else if (_selectedFrequency == Frequency.monthly) {
-          // Mensual
           paymentDays = [_selectedDayOfMonth];
           paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
         } else if (_selectedFrequency == Frequency.weekly) {
-          // Semanal (1 = Lunes)
           paymentDays = [_selectedDayOfWeek];
           paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
         } else if (_selectedFrequency == Frequency.daily) {
-          // Diario (Lista vacía porque es todos los días)
           if (!_isDailyVariable) {
              paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
           } else {
-            // Si es variable, guardamos el estimado como accumulated inicial para promedios
             accumulated = double.tryParse(_recurringAmountController.text) ?? 0;
           }
         }
@@ -161,12 +154,18 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..paymentAmounts = paymentAmounts
           ..isVariableDaily = _isDailyVariable
           ..accumulatedAmount = accumulated
-          ..nextPaymentDate = DateTime.now(); // TODO: Calcular fecha real después
+          ..nextPaymentDate = DateTime.now(); 
 
+        // 1. Guardar en Base de Datos
         await recurringDao.addRecurringMovement(newRecurring);
 
+        // ✅ 2. ACTUALIZAR NOTIFICACIONES
+        // Obtenemos todos los ingresos activos y reprogramamos sus alarmas
+        final allIncomes = await recurringDao.getAllRecurringMovements();
+        await NotificationService().scheduleAllNotifications(allIncomes);
+
       } else {
-        // --- GUARDAR INGRESO EXTRA (TRANSACTION) ---
+        // --- GUARDAR INGRESO EXTRA ---
         final transactionDao = ref.read(transactionDaoProvider);
 
         final newTransaction = FinancialTransaction()
@@ -181,7 +180,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         await transactionDao.addTransaction(newTransaction);
       }
 
-      // Cerrar modal y mostrar éxito
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,15 +192,10 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     }
   }
 
-  // ... (El resto del código _buildEventualForm, _buildRecurringForm se mantiene IGUAL que antes)
-  // COPIA AQUÍ LOS MÉTODOS VISUALES QUE TE PASÉ EN EL MENSAJE ANTERIOR (_buildEventualForm, etc.)
-  // Si necesitas que te los repita completos, avísame, pero son idénticos.
-  
-  // --- INSERTA AQUÍ EL RESTO DE MÉTODOS VISUALES DEL CÓDIGO ANTERIOR ---
-  // (Para ahorrar espacio no los repito, pero son necesarios para que compile)
-    // ===========================================================================
-  // FORMULARIO EVENTUAL (SIMPLE)
   // ===========================================================================
+  // FORMULARIOS VISUALES
+  // ===========================================================================
+  
   Widget _buildEventualForm(ColorScheme colors) {
     return Column(
       children: [
@@ -217,7 +210,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ),
         ),
         const Gap(15),
-        // Selector de Fecha
         InkWell(
           onTap: () async {
             final DateTime? picked = await showDatePicker(
@@ -232,7 +224,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
             decoration: BoxDecoration(
-              border: Border.all(color: colors.outline.withValues(alpha: 0.5)),
+              border: Border.all(color: colors.outline.withOpacity(0.5)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -256,13 +248,9 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // ===========================================================================
-  // FORMULARIO RECURRENTE (COMPLEJO)
-  // ===========================================================================
   Widget _buildRecurringForm(ColorScheme colors) {
     return Column(
       children: [
-        // 1. TÍTULO DEL INGRESO
         TextField(
           controller: _titleController,
           decoration: InputDecoration(
@@ -272,8 +260,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ),
         ),
         const Gap(15),
-
-        // 2. SELECTOR DE FRECUENCIA
         DropdownButtonFormField<Frequency>(
           value: _selectedFrequency,
           decoration: InputDecoration(
@@ -292,12 +278,10 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           },
         ),
         const Gap(20),
-
-        // 3. SUB-FORMULARIO SEGÚN FRECUENCIA
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: colors.secondaryContainer.withValues(alpha: 0.3),
+            color: colors.secondaryContainer.withOpacity(0.3),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: colors.outlineVariant),
           ),
@@ -315,7 +299,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // --- A. LÓGICA QUINCENAL ---
   Widget _buildBiweeklyForm(ColorScheme colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,14 +316,12 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // --- B. LÓGICA MENSUAL ---
   Widget _buildMonthlyForm(ColorScheme colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text("¿Qué día del mes cobras?", style: TextStyle(fontWeight: FontWeight.bold)),
         const Gap(10),
-        // Dropdown simple del 1 al 31
         DropdownButtonFormField<int>(
           value: _selectedDayOfMonth,
           decoration: InputDecoration(
@@ -358,7 +339,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // --- C. LÓGICA SEMANAL ---
   Widget _buildWeeklyForm(ColorScheme colors) {
     const days = ["L", "M", "M", "J", "V", "S", "D"];
     return Column(
@@ -387,7 +367,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // --- D. LÓGICA DIARIA ---
   Widget _buildDailyForm(ColorScheme colors) {
     return Column(
       children: [
@@ -408,7 +387,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  // --- WIDGET AUXILIAR: INPUT DE DINERO ---
   Widget _buildMoneyInput(TextEditingController controller, String label, ColorScheme colors) {
     return TextField(
       controller: controller,

@@ -13,11 +13,20 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.surface,
+      // ✅ AppBar Limpio: Solo título, sin botón de debug
+      appBar: AppBar(
+        backgroundColor: colors.surface,
+        elevation: 0,
+        title: Text(
+          "FinApp", 
+          style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary)
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const Gap(20),
+              const Gap(10),
               
               _BalanceHeader(colors: colors),
               const Gap(20),
@@ -46,10 +55,30 @@ class HomeScreen extends StatelessWidget {
                 crossAxisSpacing: 15,
                 childAspectRatio: 1.3,
                 children: [
-                  _MenuCard(title: "Ingresos", icon: FontAwesomeIcons.arrowTrendUp, color: Colors.green, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IncomeScreen()))),
-                  _MenuCard(title: "Gastos", icon: FontAwesomeIcons.arrowTrendDown, color: Colors.red, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen()))),
-                  _MenuCard(title: "Análisis", icon: FontAwesomeIcons.chartPie, color: Colors.blue, onTap: () {}),
-                  _MenuCard(title: "Metas", icon: FontAwesomeIcons.bullseye, color: Colors.orange, onTap: () {}),
+                  _MenuCard(
+                    title: "Ingresos", 
+                    icon: FontAwesomeIcons.arrowTrendUp, 
+                    color: Colors.green, 
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IncomeScreen()))
+                  ),
+                  _MenuCard(
+                    title: "Gastos", 
+                    icon: FontAwesomeIcons.arrowTrendDown, 
+                    color: Colors.red, 
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen()))
+                  ),
+                  _MenuCard(
+                    title: "Análisis", 
+                    icon: FontAwesomeIcons.chartPie, 
+                    color: Colors.blue, 
+                    onTap: () {}
+                  ),
+                  _MenuCard(
+                    title: "Metas", 
+                    icon: FontAwesomeIcons.bullseye, 
+                    color: Colors.orange, 
+                    onTap: () {}
+                  ),
                 ],
               ),
               const Gap(80),

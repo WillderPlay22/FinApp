@@ -8,7 +8,7 @@ class TransactionDao {
 
   TransactionDao(this.isarService);
 
-  // Guardar transacción
+  // 1. Guardar transacción (Sirve para Ingresos y Gastos Extras)
   Future<void> addTransaction(FinancialTransaction transaction) async {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
@@ -16,7 +16,7 @@ class TransactionDao {
     });
   }
 
-  // Verificar si ya existe un pago
+  // 2. Verificar si ya existe un pago (Para lógica de recurrentes)
   Future<bool> isPaymentMade({
     required int recurringId, 
     required DateTime start, 
@@ -34,25 +34,33 @@ class TransactionDao {
     return count > 0;
   }
 
-  // Leer todas
-  Future<List<FinancialTransaction>> getAllTransactions() async {
+  // ✅ 3. NUEVO: CONTAR PAGOS (Necesario para la corrección quincenal)
+  Future<int> countPayments({
+    required int recurringId, 
+    required DateTime start, 
+    required DateTime end
+  }) async {
     final isar = await isarService.db;
+    
     return await isar.financialTransactions
-        .where()
-        .sortByDateDesc()
-        .findAll();
+        .filter()
+        .parentRecurringIdEqualTo(recurringId)
+        .and()
+        .dateBetween(start, end)
+        .count();
   }
 
-  // Escuchar cambios
-  Stream<List<FinancialTransaction>> watchTransactions() async* {
+  // 4. Leer SOLO INGRESOS
+  Stream<List<FinancialTransaction>> watchIncomeTransactions() async* {
     final isar = await isarService.db;
     yield* isar.financialTransactions
-        .where()
+        .filter()
+        .typeEqualTo(TransactionType.income)
         .sortByDateDesc()
         .watch(fireImmediately: true);
   }
 
-  // Total Ingresos Mes
+  // 5. Total Ingresos Mes
   Stream<double> watchTotalIncomeThisMonth() async* {
     final isar = await isarService.db;
     final now = DateTime.now();
@@ -69,5 +77,12 @@ class TransactionDao {
           return transactions.fold(0.0, (sum, item) => sum + item.amount);
         });
   }
+
+  // 6. BORRAR TRANSACCIÓN (Para el Swipe)
+  Future<void> deleteTransaction(int id) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      await isar.financialTransactions.delete(id);
+    });
+  }
 }
-// ⚠️ PROVIDER ELIMINADO AQUÍ (Ya está en database_providers.dart)

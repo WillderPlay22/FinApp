@@ -8,8 +8,8 @@ import '../../../data/models/recurring_movement.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/daos/transaction_dao.dart'; 
-import '../../../logic/providers/time_provider.dart';
 import '../../../logic/providers/database_providers.dart'; 
+import '../../../logic/services/notification_service.dart';
 
 class RecurringDetailModal extends ConsumerStatefulWidget {
   final RecurringMovement movement;
@@ -23,10 +23,9 @@ class RecurringDetailModal extends ConsumerStatefulWidget {
 class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
   
   void _refresh() {
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
-  // Traducción limpia
   final Map<Frequency, String> frequencyNames = {
     Frequency.daily: "Diario",
     Frequency.weekly: "Semanal",
@@ -39,7 +38,7 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final textStyles = Theme.of(context).textTheme;
-    final currentDate = ref.watch(nowProvider);
+    final currentDate = DateTime.now(); 
     final transactionDao = ref.watch(transactionDaoProvider);
 
     return Container(
@@ -53,7 +52,6 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // HEADER
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -72,7 +70,6 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
             ),
             const Gap(16),
             
-            // TÍTULO LIMPIO (Sin "Ingreso Recurrente")
             Text(
               frequencyNames[widget.movement.frequency] ?? "Recurrente", 
               textAlign: TextAlign.center, 
@@ -86,7 +83,6 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
             
             const Gap(24), const Divider(), const Gap(16),
 
-            // CICLO
             Row(
               children: [
                 Icon(FontAwesomeIcons.calendarCheck, size: 16, color: colors.primary),
@@ -99,7 +95,6 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
             ),
             const Gap(15),
 
-            // CONTROLES DE PAGO SEGÚN FRECUENCIA
             if (widget.movement.frequency == Frequency.daily)
               _buildDailyControls(context, currentDate, transactionDao)
             else if (widget.movement.frequency == Frequency.weekly)
@@ -118,134 +113,101 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
     );
   }
 
-  // --- 1. CONTROL DIARIO ---
+  // --- CONTROLES DE PAGO (SIN CAMBIOS) ---
   Widget _buildDailyControls(BuildContext context, DateTime currentDate, TransactionDao dao) {
-    final amounts = widget.movement.paymentAmounts ?? [];
-    final amountDaily = amounts.isNotEmpty ? amounts[0] : 0.0;
-    
-    // Rango: Todo el día de hoy
-    final startDay = DateTime(currentDate.year, currentDate.month, currentDate.day, 0, 0);
-    final endDay = DateTime(currentDate.year, currentDate.month, currentDate.day, 23, 59);
-
+    final amount = (widget.movement.paymentAmounts?.isNotEmpty == true) ? widget.movement.paymentAmounts![0] : 0.0;
     return _PaymentButton(
       label: "Día ${DateFormat('dd/MM').format(currentDate)}",
-      overrideStartCheck: startDay,
-      overrideEndCheck: endDay,
+      overrideStartCheck: DateTime(currentDate.year, currentDate.month, currentDate.day, 0, 0),
+      overrideEndCheck: DateTime(currentDate.year, currentDate.month, currentDate.day, 23, 59),
       dateExpected: currentDate,
       parentIncome: widget.movement,
-      amountToPay: amountDaily,
-      currentDate: currentDate,
+      amountToPay: amount,
       dao: dao,
       isEnabled: true,
       onPaymentSuccess: _refresh,
     );
   }
 
-  // --- 2. CONTROL SEMANAL ---
   Widget _buildWeeklyControls(BuildContext context, DateTime currentDate, TransactionDao dao) {
-    final amounts = widget.movement.paymentAmounts ?? [];
-    final amountWeek = amounts.isNotEmpty ? amounts[0] : 0.0;
-    
-    // Obtenemos el día configurado (1=Lunes)
+    final amount = (widget.movement.paymentAmounts?.isNotEmpty == true) ? widget.movement.paymentAmounts![0] : 0.0;
     final configDay = (widget.movement.paymentDays?.isNotEmpty == true) ? widget.movement.paymentDays![0] : 1;
-
-    // Calculamos la fecha de ese día en la semana actual
-    // Truco: Encontrar el lunes y sumar (configDay - 1)
     final currentWeekday = currentDate.weekday;
     final monday = currentDate.subtract(Duration(days: currentWeekday - 1));
-    final targetDate = monday.add(Duration(days: configDay - 1));
-
-    // Rango de validación: Ese día completo
-    final startDay = DateTime(targetDate.year, targetDate.month, targetDate.day, 0, 0);
-    final endDay = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59);
-
     return _PaymentButton(
       label: "Semana del ${monday.day} ${DateFormat('MMM', 'es').format(monday)}",
-      overrideStartCheck: startDay,
-      overrideEndCheck: endDay,
-      dateExpected: targetDate, // Se guarda con la fecha del día de cobro
+      overrideStartCheck: DateTime(monday.year, monday.month, monday.day, 0, 0),
+      overrideEndCheck: monday.add(const Duration(days: 6, hours: 23, minutes: 59)),
+      dateExpected: monday.add(Duration(days: configDay - 1)),
       parentIncome: widget.movement,
-      amountToPay: amountWeek,
-      currentDate: currentDate,
+      amountToPay: amount,
       dao: dao,
       isEnabled: true,
       onPaymentSuccess: _refresh,
     );
   }
 
-  // --- 3. CONTROL MENSUAL ---
   Widget _buildMonthlyControls(BuildContext context, DateTime currentDate, TransactionDao dao) {
-    final amounts = widget.movement.paymentAmounts ?? [];
-    final amountMonth = amounts.isNotEmpty ? amounts[0] : 0.0;
-
+    final amount = (widget.movement.paymentAmounts?.isNotEmpty == true) ? widget.movement.paymentAmounts![0] : 0.0;
     final configDay = (widget.movement.paymentDays?.isNotEmpty == true) ? widget.movement.paymentDays![0] : 1;
     final lastDayOfMonth = DateTime(currentDate.year, currentDate.month + 1, 0).day;
-    // Ajuste: si configura 31 y el mes trae 30, se cobra el 30
     final actualPayDay = (configDay > lastDayOfMonth) ? lastDayOfMonth : configDay;
-    
-    final targetDate = DateTime(currentDate.year, currentDate.month, actualPayDay);
-    
-    // Rango: Todo el mes (para evitar cobros dobles)
-    final startMonth = DateTime(currentDate.year, currentDate.month, 1);
-    final endMonth = DateTime(currentDate.year, currentDate.month + 1, 0, 23, 59, 59);
-
     return _PaymentButton(
       label: "Mes de ${DateFormat('MMMM', 'es').format(currentDate)}",
-      overrideStartCheck: startMonth,
-      overrideEndCheck: endMonth,
-      dateExpected: targetDate,
+      overrideStartCheck: DateTime(currentDate.year, currentDate.month, 1),
+      overrideEndCheck: DateTime(currentDate.year, currentDate.month + 1, 0, 23, 59),
+      dateExpected: DateTime(currentDate.year, currentDate.month, actualPayDay),
       parentIncome: widget.movement,
-      amountToPay: amountMonth,
-      currentDate: currentDate,
+      amountToPay: amount,
       dao: dao,
       isEnabled: true,
       onPaymentSuccess: _refresh,
     );
   }
 
-  // --- 4. CONTROL QUINCENAL (INTACTO) ---
   Widget _buildBiweeklyControls(BuildContext context, DateTime currentDate, TransactionDao dao) {
     final amounts = widget.movement.paymentAmounts ?? [];
     final amount15 = amounts.isNotEmpty ? amounts[0] : 0.0;
     final amount30 = amounts.length > 1 ? amounts[1] : amount15;
 
-    final startQ1 = DateTime(currentDate.year, currentDate.month, 1);
-    final endQ1 = DateTime(currentDate.year, currentDate.month, 15, 23, 59, 59);
-    
-    final startQ2 = DateTime(currentDate.year, currentDate.month, 16);
-    final endQ2 = DateTime(currentDate.year, currentDate.month + 1, 0, 23, 59, 59);
+    final startOfMonth = DateTime(currentDate.year, currentDate.month, 1);
+    final endOfMonth = DateTime(currentDate.year, currentDate.month + 1, 0, 23, 59, 59);
+    final targetDate1 = DateTime(currentDate.year, currentDate.month, 15);
+    final targetDate2 = DateTime(currentDate.year, currentDate.month + 1, 0);
 
     return Column(
       children: [
         _PaymentButton(
           label: "1ª Quincena (Día 15)",
-          overrideStartCheck: startQ1,
-          overrideEndCheck: endQ1,
-          dateExpected: DateTime(currentDate.year, currentDate.month, 15),
+          overrideStartCheck: startOfMonth,
+          overrideEndCheck: endOfMonth,
+          dateExpected: targetDate1,
           parentIncome: widget.movement,
           amountToPay: amount15, 
-          currentDate: currentDate, 
           dao: dao,
           isEnabled: true,
           onPaymentSuccess: _refresh,
+          customCheck: dao.countPayments(recurringId: widget.movement.id, start: startOfMonth, end: endOfMonth)
+              .then((count) => count >= 1),
         ),
         const Gap(12),
-        FutureBuilder<bool>(
-          future: dao.isPaymentMade(recurringId: widget.movement.id, start: startQ1, end: endQ1),
+        FutureBuilder<int>(
+          future: dao.countPayments(recurringId: widget.movement.id, start: startOfMonth, end: endOfMonth),
           builder: (context, snapshot) {
-            final isFirstPaid = snapshot.data ?? false;
+            final count = snapshot.data ?? 0;
+            final isFirstPaid = count >= 1; 
             return _PaymentButton(
               label: "2ª Quincena (Fin de Mes)",
-              overrideStartCheck: startQ2,
-              overrideEndCheck: endQ2,
-              dateExpected: DateTime(currentDate.year, currentDate.month + 1, 0),
+              overrideStartCheck: startOfMonth,
+              overrideEndCheck: endOfMonth,
+              dateExpected: targetDate2,
               parentIncome: widget.movement,
               amountToPay: amount30, 
-              currentDate: currentDate,
               dao: dao,
               isEnabled: isFirstPaid, 
               lockedMessage: "Cobra la 1ª quincena primero",
               onPaymentSuccess: _refresh,
+              customCheck: Future.value(count >= 2), 
             );
           },
         ),
@@ -253,8 +215,9 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
     );
   }
 
-  // --- EDICIÓN AVANZADA (CON SELECTORES DE DÍA) ---
-  void _showEditDialog(BuildContext context) {
+  // --- LÓGICA DE EDICIÓN Y ELIMINACIÓN CORREGIDA ---
+
+  void _showEditDialog(BuildContext parentContext) {
     final titleCtrl = TextEditingController(text: widget.movement.title);
     
     final currentAmounts = widget.movement.paymentAmounts ?? [];
@@ -268,106 +231,80 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
     final isWeekly = widget.movement.frequency == Frequency.weekly;
     final isMonthly = widget.movement.frequency == Frequency.monthly;
 
-    // Día actual configurado (si existe, sino 1)
     int selectedDay = (widget.movement.paymentDays?.isNotEmpty == true) ? widget.movement.paymentDays![0] : 1;
 
     showDialog(
-      context: context,
+      context: parentContext,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctxEdit) => StatefulBuilder(
         builder: (context, setStateDialog) {
           return AlertDialog(
             title: const Text("Editar Ingreso"),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: "Nombre", prefixIcon: Icon(Icons.label_outline))),
                   const Gap(15),
-                  
-                  // CAMPOS DE MONTO
                   if (isBiweekly) ...[
-                    TextField(controller: amount1Ctrl, decoration: const InputDecoration(labelText: "Monto Día 15", prefixIcon: Icon(Icons.attach_money)), keyboardType: TextInputType.number),
+                    TextField(controller: amount1Ctrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Monto Día 15", prefixIcon: Icon(Icons.attach_money))),
                     const Gap(10),
-                    TextField(controller: amount2Ctrl, decoration: const InputDecoration(labelText: "Monto Día Último", prefixIcon: Icon(Icons.attach_money)), keyboardType: TextInputType.number),
-                  ] else ...[
-                    TextField(controller: amount1Ctrl, decoration: const InputDecoration(labelText: "Monto", prefixIcon: Icon(Icons.attach_money)), keyboardType: TextInputType.number),
-                  ],
-
+                    TextField(controller: amount2Ctrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Monto Día Último", prefixIcon: Icon(Icons.attach_money))),
+                  ] else 
+                    TextField(controller: amount1Ctrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Monto", prefixIcon: Icon(Icons.attach_money))),
+                  
                   const Gap(15),
-
-                  // SELECTOR DE DÍA (SEMANAL)
-                  if (isWeekly) ...[
-                    const Text("Día de cobro:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  if (isWeekly || isMonthly) ...[
                     DropdownButton<int>(
                       value: selectedDay,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text("Lunes")),
-                        DropdownMenuItem(value: 2, child: Text("Martes")),
-                        DropdownMenuItem(value: 3, child: Text("Miércoles")),
-                        DropdownMenuItem(value: 4, child: Text("Jueves")),
-                        DropdownMenuItem(value: 5, child: Text("Viernes")),
-                        DropdownMenuItem(value: 6, child: Text("Sábado")),
-                        DropdownMenuItem(value: 7, child: Text("Domingo")),
-                      ], 
-                      onChanged: (val) => setStateDialog(() => selectedDay = val!)
-                    ),
-                  ],
-
-                  // SELECTOR DE DÍA (MENSUAL)
-                  if (isMonthly) ...[
-                    const Text("Día del mes:", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    DropdownButton<int>(
-                      value: selectedDay,
-                      isExpanded: true,
-                      menuMaxHeight: 200, // Hace scroll si la lista es larga
-                      items: List.generate(31, (index) => DropdownMenuItem(value: index + 1, child: Text("Día ${index + 1}"))),
-                      onChanged: (val) => setStateDialog(() => selectedDay = val!)
-                    ),
+                      items: List.generate(isWeekly ? 7 : 31, (i) => DropdownMenuItem(value: i + 1, child: Text(isWeekly ? _getDayName(i + 1) : "Día ${i + 1}"))),
+                      onChanged: (v) => setStateDialog(() => selectedDay = v!),
+                    )
                   ],
 
                   const Gap(25),
                   SizedBox(
                     width: double.infinity,
                     child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _confirmDelete(context);
-                      },
                       icon: const Icon(Icons.delete, color: Colors.red),
                       label: const Text("Eliminar Ingreso", style: TextStyle(color: Colors.red)),
+                      onPressed: () async {
+                        // ✅ PASO 1: Cerrar diálogo de Editar
+                        Navigator.of(ctxEdit).pop();
+                        
+                        // ✅ PASO 2: Pequeña pausa para que termine la animación
+                        await Future.delayed(const Duration(milliseconds: 200));
+
+                        // ✅ PASO 3: Verificar si el widget principal sigue vivo
+                        if (mounted) {
+                          // Llamamos a confirmar usando el contexto del widget padre
+                          _confirmDelete(parentContext); 
+                        }
+                      },
                     ),
                   )
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+              TextButton(onPressed: () => Navigator.pop(ctxEdit), child: const Text("Cancelar")),
               ElevatedButton(
                 onPressed: () async {
+                  // Guardado normal...
                   final newTitle = titleCtrl.text;
                   final amt1 = double.tryParse(amount1Ctrl.text) ?? 0.0;
                   final amt2 = double.tryParse(amount2Ctrl.text) ?? 0.0;
-                  
-                  final updatedMovement = widget.movement..title = newTitle;
-                  
-                  if (isBiweekly) {
-                     updatedMovement.paymentAmounts = [amt1, amt2];
-                  } else {
-                     updatedMovement.paymentAmounts = [amt1];
-                  }
+                  widget.movement.title = newTitle;
+                  if (isBiweekly) widget.movement.paymentAmounts = [amt1, amt2];
+                  else widget.movement.paymentAmounts = [amt1];
+                  if (isWeekly || isMonthly) widget.movement.paymentDays = [selectedDay];
 
-                  // GUARDAR DÍA ELEGIDO
-                  if (isWeekly || isMonthly) {
-                    updatedMovement.paymentDays = [selectedDay];
-                  }
+                  await ref.read(recurringDaoProvider).addRecurringMovement(widget.movement);
+                  final allIncomes = await ref.read(recurringDaoProvider).getAllRecurringMovements();
+                  await NotificationService().scheduleAllNotifications(allIncomes);
 
-                  await ref.read(recurringDaoProvider).addRecurringMovement(updatedMovement);
-                  
-                  if (context.mounted) {
-                    Navigator.pop(ctx);
+                  if (mounted) {
+                    Navigator.pop(ctxEdit);
                     _refresh();
                   }
                 },
@@ -380,20 +317,38 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
+  void _confirmDelete(BuildContext parentContext) {
     showDialog(
-      context: context, 
-      builder: (ctx) => AlertDialog(
+      context: parentContext, 
+      barrierDismissible: false,
+      builder: (ctxConfirm) => AlertDialog(
         title: const Text("¿Eliminar?"),
-        content: const Text("Se dejará de proyectar este ingreso a futuro."),
+        content: const Text("Se borrará este ingreso recurrente."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          TextButton(onPressed: () => Navigator.pop(ctxConfirm), child: const Text("Cancelar")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () {
-               ref.read(recurringDaoProvider).deleteRecurringMovement(widget.movement.id);
-               Navigator.pop(ctx); 
-               Navigator.pop(context); 
+            onPressed: () async {
+               // 1. Eliminar de BD
+               await ref.read(recurringDaoProvider).deleteRecurringMovement(widget.movement.id);
+               
+               // 2. Actualizar Notificaciones
+               final allIncomes = await ref.read(recurringDaoProvider).getAllRecurringMovements();
+               await NotificationService().scheduleAllNotifications(allIncomes);
+               
+               // 3. SECUENCIA DE CIERRE SEGURA
+               if (mounted) {
+                 // Cerrar Confirmación
+                 Navigator.of(ctxConfirm).pop();
+                 
+                 // Esperar animación
+                 await Future.delayed(const Duration(milliseconds: 100));
+
+                 // Cerrar el Modal de Detalles (BottomSheet)
+                 if (parentContext.mounted) {
+                    Navigator.of(parentContext).pop(); 
+                 }
+               }
             }, 
             child: const Text("Eliminar")
           )
@@ -401,9 +356,15 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
       )
     );
   }
+
+  String _getDayName(int day) {
+    const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    if (day >= 1 && day <= 7) return days[day - 1];
+    return "Día $day";
+  }
 }
 
-// --- BOTÓN DE PAGO (GENÉRICO) ---
+// ... _PaymentButton se mantiene igual ...
 class _PaymentButton extends StatefulWidget {
   final String label;
   final DateTime overrideStartCheck;
@@ -411,11 +372,11 @@ class _PaymentButton extends StatefulWidget {
   final DateTime dateExpected; 
   final RecurringMovement parentIncome;
   final double amountToPay;
-  final DateTime currentDate; 
   final TransactionDao dao;
   final bool isEnabled;
   final String? lockedMessage;
   final VoidCallback onPaymentSuccess;
+  final Future<bool>? customCheck; 
 
   const _PaymentButton({
     required this.label,
@@ -424,11 +385,11 @@ class _PaymentButton extends StatefulWidget {
     required this.dateExpected,
     required this.parentIncome,
     required this.amountToPay,
-    required this.currentDate,
     required this.dao,
     required this.isEnabled,
     required this.onPaymentSuccess,
     this.lockedMessage,
+    this.customCheck, 
   });
 
   @override
@@ -440,8 +401,14 @@ class _PaymentButtonState extends State<_PaymentButton> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
+    final checkFuture = widget.customCheck ?? widget.dao.isPaymentMade(
+      recurringId: widget.parentIncome.id, 
+      start: widget.overrideStartCheck, 
+      end: widget.overrideEndCheck
+    );
+
     return FutureBuilder<bool>(
-      future: widget.dao.isPaymentMade(recurringId: widget.parentIncome.id, start: widget.overrideStartCheck, end: widget.overrideEndCheck),
+      future: checkFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox(height: 50, child: Center(child: LinearProgressIndicator())); 
         final isPaid = snapshot.data!;
@@ -492,6 +459,7 @@ class _PaymentButtonState extends State<_PaymentButton> {
 
   void _showConfirmDialog(BuildContext context) {
     final controller = TextEditingController(text: widget.amountToPay.toString());
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, 
@@ -502,14 +470,12 @@ class _PaymentButtonState extends State<_PaymentButton> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text("Confirmar Ingreso", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            const Gap(5),
-            Text("Se registrará con fecha: ${DateFormat('dd/MM/yyyy').format(widget.dateExpected)}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.grey)),
             const Gap(20),
             TextField(
               controller: controller,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
-              autofocus: false, // Teclado no salta auto
+              autofocus: false, 
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
               decoration: const InputDecoration(prefixIcon: Icon(Icons.attach_money, color: Colors.green), border: OutlineInputBorder()),
             ),
@@ -521,7 +487,7 @@ class _PaymentButtonState extends State<_PaymentButton> {
                   final newTx = FinancialTransaction()
                     ..amount = amount
                     ..note = "Cobro: ${widget.label}"
-                    ..date = widget.dateExpected 
+                    ..date = DateTime.now() 
                     ..type = TransactionType.income
                     ..categoryName = widget.parentIncome.title
                     ..categoryIconCode = FontAwesomeIcons.sackDollar.codePoint

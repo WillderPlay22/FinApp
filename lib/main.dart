@@ -8,10 +8,8 @@ import 'config/theme/app_theme.dart';
 import 'ui/home/home_screen.dart';
 import 'data/local_db/isar_db.dart';
 import 'logic/services/category_seeder.dart';
-import 'logic/services/notification_service.dart';
-
+import 'logic/services/notification_service.dart'; // Importar servicio
 import 'ui/income/modals/recurring_detail_modal.dart';
-// IMPORTANTE: Este import es el que arregla el error rojo de Isar
 import 'data/models/recurring_movement.dart'; 
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -20,13 +18,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
 
+  // 1. Iniciar Servicio de Notificaciones
   await NotificationService().init();
 
   final isarService = IsarService();
   final seeder = CategorySeeder(isarService);
   await seeder.seedDefaults();
 
-  // Programar notificaciones futuras al iniciar la app
+  // 2. Programar notificaciones al iniciar (para recuperar alarmas si se apagó el cel)
   final isar = await isarService.db;
   final allIncomes = await isar.recurringMovements.where().findAll();
   await NotificationService().scheduleAllNotifications(allIncomes);
@@ -45,23 +44,28 @@ class _MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
+    // Escuchar si tocan una notificación para abrir el modal
     NotificationService().selectNotificationStream.stream.listen((payload) {
       if (payload != null) _handleNotificationOpen(payload);
     });
   }
 
   Future<void> _handleNotificationOpen(String payload) async {
-    final parts = payload.split('|');
-    final incomeId = int.parse(parts[0]);
-    final isar = await IsarService().db;
-    final income = await isar.recurringMovements.get(incomeId);
+    try {
+      final parts = payload.split('|');
+      final incomeId = int.parse(parts[0]);
+      final isar = await IsarService().db;
+      final income = await isar.recurringMovements.get(incomeId);
 
-    if (income != null && navigatorKey.currentContext != null) {
-      showModalBottomSheet(
-        context: navigatorKey.currentContext!,
-        isScrollControlled: true,
-        builder: (ctx) => RecurringDetailModal(movement: income),
-      );
+      if (income != null && navigatorKey.currentContext != null) {
+        showModalBottomSheet(
+          context: navigatorKey.currentContext!,
+          isScrollControlled: true,
+          builder: (ctx) => RecurringDetailModal(movement: income),
+        );
+      }
+    } catch (e) {
+      print("Error abriendo notificación: $e");
     }
   }
 

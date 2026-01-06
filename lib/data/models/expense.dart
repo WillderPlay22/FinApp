@@ -1,22 +1,25 @@
 import 'package:isar/isar.dart';
-import 'category.dart'; // Importamos la categoría que acabamos de crear
+import 'category.dart';
+import 'enums.dart'; // Importamos el enum Frequency
 
-part 'expense.g.dart'; // Dará error temporalmente
+part 'expense.g.dart';
 
 @collection
 class Expense {
   Id id = Isar.autoIncrement;
 
-  late String title; // Ej: "Netflix"
+  late String title;
   
-  late double amount; // Ej: 15.00
+  late double amount; 
   
-  late DateTime date; // Fecha del gasto
+  late DateTime date; 
 
-  // ¿Es un gasto fijo heredado de la categoría? 
   bool isRecurring = false; 
 
-  // RELACIÓN: Un gasto pertenece a una Categoría
+  // ✅ NUEVO: Frecuencia para la proyección
+  @Enumerated(EnumType.name)
+  late Frequency frequency;
+
   final category = IsarLink<Category>();
 
   Expense({
@@ -24,5 +27,6 @@ class Expense {
     required this.amount,
     required this.date,
     this.isRecurring = false,
+    this.frequency = Frequency.monthly, // Por defecto mensual
   });
 }

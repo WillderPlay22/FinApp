@@ -18,7 +18,7 @@ class ExpenseSummaryHeader extends ConsumerWidget {
           // TARJETA 1: GASTADO REAL (Este Mes)
           Expanded(
             child: StreamBuilder<double>(
-              stream: expenseDao.watchTotalExpenseThisMonth(),
+              stream: expenseDao.watchTotalExecutedThisMonth(),
               builder: (context, snapshot) {
                 final total = snapshot.data ?? 0.0;
                 return _SummaryCard(
@@ -34,14 +34,20 @@ class ExpenseSummaryHeader extends ConsumerWidget {
           
           const Gap(12),
 
-          // TARJETA 2: PROYECTADO
-          const Expanded(
-            child: _SummaryCard(
-              title: "Proyectado",
-              amount: 0.0, 
-              icon: FontAwesomeIcons.chartLine,
-              color: Colors.orange,
-              isFilled: false,
+          // TARJETA 2: PROYECTADO (Fijos * Frec + Extras)
+          Expanded(
+            child: StreamBuilder<double>(
+              stream: expenseDao.watchTotalProjectedThisMonth(),
+              builder: (context, snapshot) {
+                final total = snapshot.data ?? 0.0;
+                return _SummaryCard(
+                  title: "Proyectado",
+                  amount: total,
+                  icon: FontAwesomeIcons.chartLine,
+                  color: Colors.orange,
+                  isFilled: false,
+                );
+              },
             ),
           ),
         ],
@@ -79,7 +85,7 @@ class _SummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: isFilled ? null : Border.all(color: theme.colorScheme.outlineVariant),
         boxShadow: isFilled 
-            ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))]
+            ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))]
             : null,
       ),
       child: Column(

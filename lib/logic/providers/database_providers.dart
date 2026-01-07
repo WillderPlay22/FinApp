@@ -20,17 +20,25 @@ final transactionDaoProvider = Provider<TransactionDao>((ref) {
 // 3. Proveedor del DAO de Recurrentes (Ingresos Fijos)
 final recurringDaoProvider = Provider<RecurringDao>((ref) {
   final isarService = ref.watch(isarServiceProvider);
+  // ✅ CORRECCIÓN: El DAO de recurrentes original no necesita `ref`.
   return RecurringDao(isarService);
 });
 
 // 4. Proveedor del DAO de Gastos (NUEVO)
 final expenseDaoProvider = Provider<ExpenseDao>((ref) {
   final isarService = ref.watch(isarServiceProvider);
-  return ExpenseDao(isarService);
+  // Le pasamos el servicio de DB y la referencia `ref` completa para que el DAO pueda usarla.
+  return ExpenseDao(isarService, ref);
 });
 
 // 5. Proveedor del DAO de Categorías (NUEVO)
 final categoryDaoProvider = Provider<CategoryDao>((ref) {
   final isarService = ref.watch(isarServiceProvider);
   return CategoryDao(isarService);
+});
+
+// 6. Proveedor del Stream de Categorías de Gastos (NUEVO)
+final expenseCategoriesProvider = StreamProvider((ref) {
+  final dao = ref.watch(categoryDaoProvider);
+  return dao.watchExpenseCategories();
 });

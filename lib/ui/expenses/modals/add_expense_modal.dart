@@ -7,6 +7,7 @@ import '../../../data/models/category.dart';
 import '../../../data/models/expense.dart';
 import '../../../data/models/enums.dart'; 
 import '../../../logic/providers/database_providers.dart';
+import '../../shared/icon_mapper.dart';
 import 'create_category_modal.dart';
 
 class AddExpenseModal extends ConsumerStatefulWidget {
@@ -257,7 +258,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                             border: isSelected ? Border.all(color: colors.onSurface, width: 2) : null,
                           ),
                           child: Icon(
-                            IconData(category.iconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
+                            getIconFromCode(category.iconCode),
                             color: isSelected ? Colors.white : Colors.grey,
                             size: 20,
                           ),

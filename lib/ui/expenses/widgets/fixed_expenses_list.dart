@@ -4,7 +4,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import '../../../data/models/expense.dart';
 import '../../../data/models/enums.dart'; 
+import '../../../date_utils.dart';
 import '../../../logic/providers/database_providers.dart';
+import '../../shared/icon_mapper.dart'; // ✅ Esta ruta ya es correcta
 import '../../../logic/models/category_with_expenses.dart'; // Importa el modelo nuevo
 import '../modals/fixed_category_detail_modal.dart'; // El nuevo modal de detalles
 
@@ -13,12 +15,17 @@ class FixedExpensesList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expenseDao = ref.watch(expenseDaoProvider);
     final colors = Theme.of(context).colorScheme;
+
+    // ✅ OBSERVADOR DE CAMBIOS EN CATEGORÍAS
+    // Al "observar" este provider, cualquier cambio en una categoría (editar, borrar)
+    // forzará la reconstrucción de este widget. Al reconstruirse, el StreamBuilder
+    // de abajo se volverá a crear, obteniendo la lista de gastos actualizada.
+    ref.watch(expenseCategoriesProvider);
 
     // 1. Obtenemos TODOS los gastos fijos
     return StreamBuilder<List<Expense>>(
-      stream: expenseDao.watchFixedExpenses(),
+      stream: ref.watch(expenseDaoProvider).watchFixedExpenses(),
       builder: (context, snapshot) {
         if (snapshot.hasError) return const Center(child: Text("Error al cargar datos"));
         if (!snapshot.hasData || snapshot.data!.isEmpty) return _buildEmptyState(colors);
@@ -105,7 +112,7 @@ class _FixedCategoryCard extends StatelessWidget {
           isScrollControlled: true,
           useSafeArea: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => FixedCategoryDetailModal(data: data),
+          builder: (context) => FixedCategoryDetailModal(categoryId: category.id),
         );
       },
       child: Container(
@@ -126,7 +133,7 @@ class _FixedCategoryCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                IconData(category.iconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
+                getIconFromCode(category.iconCode),
                 color: Color(category.colorValue),
                 size: 24,
               ),
@@ -150,7 +157,7 @@ class _FixedCategoryCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          _getFrequencyLabel(category.frequency),
+                          getFrequencyLabel(category.frequency),
                           style: TextStyle(fontSize: 10, color: colors.onSecondaryContainer, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -179,15 +186,5 @@ class _FixedCategoryCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getFrequencyLabel(Frequency? freq) {
-    switch (freq) {
-      case Frequency.weekly: return 'SEMANAL';
-      case Frequency.biweekly: return 'QUINCENAL';
-      case Frequency.monthly: return 'MENSUAL';
-      case Frequency.yearly: return 'ANUAL';
-      default: return 'MENSUAL';
-    }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:isar/isar.dart';
 import 'enums.dart';
+import 'expense.dart';
 
 part 'transaction.g.dart'; 
 
@@ -29,4 +30,13 @@ class FinancialTransaction {
   // Si es NULL, es un ingreso/gasto manual (Extra).
   @Index()
   int? parentRecurringId;
+
+  // --- VINCULACIÓN GASTOS (NUEVO) ---
+  bool isRecurring = false;
+
+  // Enlaza esta transacción al gasto fijo original que la generó.
+  final relatedExpense = IsarLink<Expense>();
+
+  // Constructor vacío para la creación de instancias sin parámetros.
+  FinancialTransaction();
 }

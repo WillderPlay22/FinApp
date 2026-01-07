@@ -43,18 +43,23 @@ const FinancialTransactionSchema = CollectionSchema(
       name: r'date',
       type: IsarType.dateTime,
     ),
-    r'note': PropertySchema(
+    r'isRecurring': PropertySchema(
       id: 5,
+      name: r'isRecurring',
+      type: IsarType.bool,
+    ),
+    r'note': PropertySchema(
+      id: 6,
       name: r'note',
       type: IsarType.string,
     ),
     r'parentRecurringId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'parentRecurringId',
       type: IsarType.long,
     ),
     r'type': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'type',
       type: IsarType.string,
       enumMap: _FinancialTransactiontypeEnumValueMap,
@@ -93,7 +98,14 @@ const FinancialTransactionSchema = CollectionSchema(
       ],
     )
   },
-  links: {},
+  links: {
+    r'relatedExpense': LinkSchema(
+      id: 1317223007959203392,
+      name: r'relatedExpense',
+      target: r'Expense',
+      single: true,
+    )
+  },
   embeddedSchemas: {},
   getId: _financialTransactionGetId,
   getLinks: _financialTransactionGetLinks,
@@ -124,9 +136,10 @@ void _financialTransactionSerialize(
   writer.writeString(offsets[2], object.categoryName);
   writer.writeLong(offsets[3], object.colorValue);
   writer.writeDateTime(offsets[4], object.date);
-  writer.writeString(offsets[5], object.note);
-  writer.writeLong(offsets[6], object.parentRecurringId);
-  writer.writeString(offsets[7], object.type.name);
+  writer.writeBool(offsets[5], object.isRecurring);
+  writer.writeString(offsets[6], object.note);
+  writer.writeLong(offsets[7], object.parentRecurringId);
+  writer.writeString(offsets[8], object.type.name);
 }
 
 FinancialTransaction _financialTransactionDeserialize(
@@ -142,10 +155,11 @@ FinancialTransaction _financialTransactionDeserialize(
   object.colorValue = reader.readLong(offsets[3]);
   object.date = reader.readDateTime(offsets[4]);
   object.id = id;
-  object.note = reader.readString(offsets[5]);
-  object.parentRecurringId = reader.readLongOrNull(offsets[6]);
+  object.isRecurring = reader.readBool(offsets[5]);
+  object.note = reader.readString(offsets[6]);
+  object.parentRecurringId = reader.readLongOrNull(offsets[7]);
   object.type = _FinancialTransactiontypeValueEnumMap[
-          reader.readStringOrNull(offsets[7])] ??
+          reader.readStringOrNull(offsets[8])] ??
       TransactionType.income;
   return object;
 }
@@ -168,10 +182,12 @@ P _financialTransactionDeserializeProp<P>(
     case 4:
       return (reader.readDateTime(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 7:
+      return (reader.readLongOrNull(offset)) as P;
+    case 8:
       return (_FinancialTransactiontypeValueEnumMap[
               reader.readStringOrNull(offset)] ??
           TransactionType.income) as P;
@@ -195,12 +211,14 @@ Id _financialTransactionGetId(FinancialTransaction object) {
 
 List<IsarLinkBase<dynamic>> _financialTransactionGetLinks(
     FinancialTransaction object) {
-  return [];
+  return [object.relatedExpense];
 }
 
 void _financialTransactionAttach(
     IsarCollection<dynamic> col, Id id, FinancialTransaction object) {
   object.id = id;
+  object.relatedExpense
+      .attach(col, col.isar.collection<Expense>(), r'relatedExpense', id);
 }
 
 extension FinancialTransactionQueryWhereSort
@@ -941,6 +959,16 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> isRecurringEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isRecurring',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
       QAfterFilterCondition> noteEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1295,7 +1323,21 @@ extension FinancialTransactionQueryObject on QueryBuilder<FinancialTransaction,
     FinancialTransaction, QFilterCondition> {}
 
 extension FinancialTransactionQueryLinks on QueryBuilder<FinancialTransaction,
-    FinancialTransaction, QFilterCondition> {}
+    FinancialTransaction, QFilterCondition> {
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedExpense(FilterQuery<Expense> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'relatedExpense');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedExpenseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'relatedExpense', 0, true, 0, true);
+    });
+  }
+}
 
 extension FinancialTransactionQuerySortBy
     on QueryBuilder<FinancialTransaction, FinancialTransaction, QSortBy> {
@@ -1366,6 +1408,20 @@ extension FinancialTransactionQuerySortBy
       sortByDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByIsRecurringDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.desc);
     });
   }
 
@@ -1499,6 +1555,20 @@ extension FinancialTransactionQuerySortThenBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByIsRecurringDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isRecurring', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       thenByNote() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'note', Sort.asc);
@@ -1579,6 +1649,13 @@ extension FinancialTransactionQueryWhereDistinct
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByIsRecurring() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isRecurring');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
       distinctByNote({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'note', caseSensitive: caseSensitive);
@@ -1640,6 +1717,13 @@ extension FinancialTransactionQueryProperty on QueryBuilder<
       dateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'date');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, bool, QQueryOperations>
+      isRecurringProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isRecurring');
     });
   }
 

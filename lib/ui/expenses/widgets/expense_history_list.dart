@@ -4,79 +4,163 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/transaction.dart';
+import '../../../data/models/enums.dart';
+import '../../../date_utils.dart';
+import '../../../logic/providers/time_provider.dart';
+import '../../shared/icon_mapper.dart';
 import '../../../logic/providers/database_providers.dart';
+
+// --- PROVIDERS PARA EL FILTRADO DEL HISTORIAL ---
+
+enum HistoryFilter { currentMonth, lastMonth, custom }
+
+final historyFilterProvider = StateProvider<HistoryFilter>((ref) => HistoryFilter.currentMonth);
+
+final historyDateRangeProvider = StateProvider<DateRange>((ref) {
+  final now = ref.watch(nowProvider);
+  return getCycleDateRange(now, Frequency.monthly);
+});
+
+final expenseTransactionsInDateRangeProvider = StreamProvider.family<List<FinancialTransaction>, DateRange>((ref, range) {
+  final expenseDao = ref.watch(expenseDaoProvider);
+  // Usamos el nuevo método que requiere un rango de fechas
+  return expenseDao.watchExpenseTransactionsInDateRange(range);
+});
 
 class ExpenseHistoryList extends ConsumerWidget {
   const ExpenseHistoryList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expenseDao = ref.watch(expenseDaoProvider);
     final colors = Theme.of(context).colorScheme;
+    final selectedFilter = ref.watch(historyFilterProvider);
+    final dateRange = ref.watch(historyDateRangeProvider);
+    final transactionsAsync = ref.watch(expenseTransactionsInDateRangeProvider(dateRange));
 
-    return StreamBuilder<List<FinancialTransaction>>(
-      stream: expenseDao.watchExpenseHistory(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Text("Error al cargar historial"));
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(FontAwesomeIcons.ghost, size: 50, color: colors.outlineVariant),
-                const Gap(10),
-                const Text("No hay gastos registrados aún."),
-              ],
-            ),
-          );
-        }
-
-        final transactions = snapshot.data!;
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: transactions.length,
-          separatorBuilder: (c, i) => const Gap(12),
-          itemBuilder: (context, index) {
-            final tx = transactions[index];
-            
-            // ✅ DISMISSIBLE PARA BORRAR DESLIZANDO (ÚNICA ACCIÓN PERMITIDA)
-            return Dismissible(
-              key: Key(tx.id.toString()),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                child: const Icon(Icons.delete, color: Colors.white),
+    return Column(
+      children: [
+        // --- BARRA DE FILTROS ---
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Wrap(
+            spacing: 8.0,
+            children: [
+              ChoiceChip(
+                label: const Text("Este Mes"),
+                selected: selectedFilter == HistoryFilter.currentMonth,
+                onSelected: (selected) {
+                  if (selected) {
+                    ref.read(historyFilterProvider.notifier).state = HistoryFilter.currentMonth;
+                    final now = ref.read(nowProvider);
+                    ref.read(historyDateRangeProvider.notifier).state = getCycleDateRange(now, Frequency.monthly);
+                  }
+                },
               ),
-              confirmDismiss: (direction) async {
-                return await showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text("¿Borrar del historial?"),
-                    content: const Text("Esta acción eliminará el registro de este pago para siempre."),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Borrar", style: TextStyle(color: Colors.red))),
+              ChoiceChip(
+                label: const Text("Mes Pasado"),
+                selected: selectedFilter == HistoryFilter.lastMonth,
+                onSelected: (selected) {
+                  if (selected) {
+                    ref.read(historyFilterProvider.notifier).state = HistoryFilter.lastMonth;
+                    final now = ref.read(nowProvider);
+                    final lastMonth = DateTime(now.year, now.month - 1, now.day);
+                    ref.read(historyDateRangeProvider.notifier).state = getCycleDateRange(lastMonth, Frequency.monthly);
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: const Text("Elegir..."),
+                selected: selectedFilter == HistoryFilter.custom,
+                onSelected: (selected) async {
+                  final newRange = await _selectMonth(context, ref);
+                  if (newRange != null) {
+                    ref.read(historyFilterProvider.notifier).state = HistoryFilter.custom;
+                    ref.read(historyDateRangeProvider.notifier).state = newRange;
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        // --- LISTA DE TRANSACCIONES ---
+        Expanded(
+          child: transactionsAsync.when(
+            data: (transactions) {
+              if (transactions.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(FontAwesomeIcons.ghost, size: 50, color: colors.outlineVariant),
+                      const Gap(10),
+                      const Text("No hay gastos en este período."),
                     ],
                   ),
                 );
-              },
-              onDismissed: (direction) {
-                expenseDao.deleteTransaction(tx.id);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Transacción eliminada")));
-              },
-              child: _ExpenseHistoryItem(transaction: tx),
-            );
-          },
-        );
-      },
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: transactions.length,
+                separatorBuilder: (c, i) => const Gap(12),
+                itemBuilder: (context, index) {
+                  final tx = transactions[index];
+                  return Dismissible(
+                    key: Key(tx.id.toString()),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text("¿Borrar del historial?"),
+                          content: const Text("Esta acción eliminará el registro de este pago para siempre."),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
+                            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Borrar", style: TextStyle(color: Colors.red))),
+                          ],
+                        ),
+                      );
+                    },
+                    onDismissed: (direction) {
+                      ref.read(expenseDaoProvider).deleteTransaction(tx.id);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Transacción eliminada")));
+                    },
+                    child: _ExpenseHistoryItem(transaction: tx),
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Center(child: Text("Error: $err")),
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<DateRange?> _selectMonth(BuildContext context, WidgetRef ref) async {
+    final now = ref.read(nowProvider);
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _MonthYearPickerDialog(
+        initialDate: ref.read(historyDateRangeProvider).start,
+        firstDate: DateTime(2020),
+        lastDate: now,
+      ),
+    );
+
+    if (picked != null) {
+      return getCycleDateRange(picked, Frequency.monthly);
+    }
+    return null;
   }
 }
 
@@ -105,7 +189,7 @@ class _ExpenseHistoryItem extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              IconData(transaction.categoryIconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
+              getIconFromCode(transaction.categoryIconCode),
               color: Color(transaction.colorValue),
               size: 20,
             ),
@@ -163,6 +247,87 @@ class _ExpenseHistoryItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Un diálogo simple para seleccionar solo mes y año.
+class _MonthYearPickerDialog extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  const _MonthYearPickerDialog({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  @override
+  State<_MonthYearPickerDialog> createState() => _MonthYearPickerDialogState();
+}
+
+class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
+  late int _selectedYear;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialDate.year;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final months = DateFormat.MMMM('es').dateSymbols.MONTHS;
+    final colors = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _selectedYear > widget.firstDate.year ? () => setState(() => _selectedYear--) : null,
+          ),
+          Text(
+            _selectedYear.toString(),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _selectedYear < widget.lastDate.year ? () => setState(() => _selectedYear++) : null,
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 300,
+        height: 300,
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5),
+          itemCount: 12,
+          itemBuilder: (context, index) {
+            final month = index + 1;
+            final isAfterLast = _selectedYear == widget.lastDate.year && month > widget.lastDate.month;
+            final isBeforeFirst = _selectedYear == widget.firstDate.year && month < widget.firstDate.month;
+            final isEnabled = !isAfterLast && !isBeforeFirst;
+
+            return InkWell(
+              onTap: isEnabled ? () => Navigator.of(context).pop(DateTime(_selectedYear, month)) : null,
+              child: Center(
+                child: Text(
+                  months[index][0].toUpperCase() + months[index].substring(1),
+                  style: TextStyle(
+                    color: isEnabled ? colors.onSurface : colors.outline.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Cancelar")),
+      ],
     );
   }
 }

@@ -16,6 +16,29 @@ class CategoryDao {
     });
   }
 
+  // ✅ NUEVO: Actualizar categoría existente
+  Future<void> updateCategory(Category category) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      await isar.categorys.put(category);
+    });
+  }
+
+  // ✅ NUEVO: Borrar categoría y todos sus gastos asociados (Cascada)
+  Future<void> deleteCategoryWithExpenses(Id categoryId) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      // 1. Borrar todos los gastos fijos que pertenecen a esta categoría
+      await isar.expenses
+          .filter()
+          .category((q) => q.idEqualTo(categoryId))
+          .deleteAll();
+      
+      // 2. Borrar la categoría
+      await isar.categorys.delete(categoryId);
+    });
+  }
+
   // Obtener todas las categorías de Gasto
   Stream<List<Category>> watchExpenseCategories() async* {
     final isar = await isarService.db;
@@ -25,7 +48,15 @@ class CategoryDao {
         .watch(fireImmediately: true);
   }
 
-  // LÓGICA AVANZADA: Calcular el total gastado por categoría
+  // ✅ NUEVO: Observa una categoría específica por su ID
+  Stream<Category?> watchCategory(int categoryId) async* {
+    final isar = await isarService.db;
+    // watchObject emite un nuevo valor cuando el objeto con ese ID cambia,
+    // o null si es borrado.
+    yield* isar.categorys.watchObject(categoryId, fireImmediately: true);
+  }
+
+  // Calcular el total gastado por categoría
   Future<double> getCategoryFixedTotal(Id categoryId) async {
     final isar = await isarService.db;
     
@@ -38,7 +69,7 @@ class CategoryDao {
 
     if (expenses.isEmpty) return 0.0;
     
-    // CORRECCIÓN AQUÍ: Agregamos <double> para evitar la confusión de tipos
+    // Sumamos los montos
     return expenses.fold<double>(0.0, (sum, item) => sum + item.amount);
   }
 }

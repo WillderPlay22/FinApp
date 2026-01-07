@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:math';
 import 'package:gap/gap.dart';
-import '../income/income_screen.dart';
-import '../expenses/expenses_screen.dart';
+import 'package:intl/intl.dart';
+
+import '../../logic/providers/database_providers.dart';
+
+// Creamos providers específicos para que la UI sea más limpia y reactiva.
+final projectedExpensesProvider = StreamProvider<double>((ref) {
+  return ref.watch(expenseDaoProvider).watchTotalProjectedThisMonth();
+});
+
+final projectedIncomeProvider = StreamProvider<double>((ref) {
+  return ref.watch(recurringDaoProvider).watchProjectedMonthlyIncome();
+});
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -10,144 +21,244 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
       backgroundColor: colors.surface,
-      // ✅ AppBar Original y Limpio
       appBar: AppBar(
+        centerTitle: true,
         backgroundColor: colors.surface,
         elevation: 0,
-        title: Text(
-          "FinApp", 
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary)
-        ),
+        title: Text("FinApp", style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary)),
       ),
-      body: SafeArea(
+      body: const SafeArea(
         child: SingleChildScrollView(
+          physics: BouncingScrollPhysics(),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Gap(10),
-              
-              _BalanceHeader(colors: colors),
+              Gap(20),
+              Text("Balance Mensual Proyectado", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300)),
               const Gap(20),
-
-              // Botón Original (Placeholder para futura IA o análisis)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Acción futura (ej: Análisis con IA)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Próximamente: Análisis Inteligente"))
-                    );
-                  },
-                  icon: const Icon(FontAwesomeIcons.robot, color: Colors.white),
-                  label: const Text("¿Puedo comprarlo?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    minimumSize: const Size(double.infinity, 50),
-                    elevation: 4,
-                  ),
-                ),
-              ),
-              const Gap(20),
-
-              // Menú Principal
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                mainAxisSpacing: 15,
-                crossAxisSpacing: 15,
-                childAspectRatio: 1.3,
-                children: [
-                  _MenuCard(
-                    title: "Ingresos", 
-                    icon: FontAwesomeIcons.arrowTrendUp, 
-                    color: Colors.green, 
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IncomeScreen()))
-                  ),
-                  _MenuCard(
-                    title: "Gastos", 
-                    icon: FontAwesomeIcons.arrowTrendDown, 
-                    color: Colors.red, 
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen()))
-                  ),
-                  _MenuCard(
-                    title: "Análisis", 
-                    icon: FontAwesomeIcons.chartPie, 
-                    color: Colors.blue, 
-                    onTap: () {} 
-                  ),
-                  _MenuCard(
-                    title: "Metas", 
-                    icon: FontAwesomeIcons.bullseye, 
-                    color: Colors.orange, 
-                    onTap: () {} 
-                  ),
-                ],
-              ),
-              const Gap(80), // Espacio para FAB
+              _AnalysisCircle(),
+              Gap(40),
+              _HomeSummaryCards(),
+              Gap(20),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen())),
-        icon: const Icon(Icons.add),
-        label: const Text("Gasto Rápido"),
+    );
+  }
+}
+
+class _AnalysisCircle extends ConsumerWidget {
+  const _AnalysisCircle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final incomeAsync = ref.watch(projectedIncomeProvider);
+    final expensesAsync = ref.watch(projectedExpensesProvider);
+    final colors = Theme.of(context).colorScheme;
+
+    // Manejo de estados de carga y error
+    if (incomeAsync.isLoading || expensesAsync.isLoading) {
+      return const SizedBox(height: 250, width: 250, child: Center(child: CircularProgressIndicator()));
+    }
+    if (incomeAsync.hasError || expensesAsync.hasError) {
+      return const Text("Error al calcular el resumen");
+    }
+
+    final projectedIncome = incomeAsync.value ?? 0.0;
+    final projectedExpenses = expensesAsync.value ?? 0.0;
+    final remaining = projectedIncome - projectedExpenses;
+    // El ratio de gasto sobre el ingreso para pintar el círculo
+    final expenseRatio = (projectedIncome > 0) ? (projectedExpenses / projectedIncome) : 0.0;
+
+    final currencyFormat = NumberFormat.currency(locale: 'es_VE', symbol: '\$', decimalDigits: 0);
+
+    return SizedBox(
+      width: 250,
+      height: 250,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // El pintor del círculo
+          SizedBox.expand(
+            child: CustomPaint(
+              painter: _CirclePainter(
+                backgroundColor: Colors.green.shade100, // Fondo verde claro
+                progressColor: Colors.red,
+                progress: expenseRatio,
+              ),
+            ),
+          ),
+          // El texto en el centro
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "Restante",
+                style: TextStyle(fontSize: 18, color: colors.outline, fontWeight: FontWeight.w500),
+              ),
+              const Gap(4),
+              Text(
+                currencyFormat.format(remaining),
+                style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: remaining >= 0 ? const Color(0xFF2E7D32) : Colors.red,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          )
+        ],
       ),
     );
   }
 }
 
-class _BalanceHeader extends StatelessWidget {
-  final ColorScheme colors;
-  const _BalanceHeader({required this.colors});
+class _HomeSummaryCards extends ConsumerWidget {
+  const _HomeSummaryCards();
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text("Saldo Disponible", style: TextStyle(color: colors.outline)),
-        const Gap(5),
-        Text("\$ 0.00", style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: colors.primary)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(color: colors.secondaryContainer, borderRadius: BorderRadius.circular(20)),
-          child: Text("Quincena Actual", style: TextStyle(color: colors.onSecondaryContainer, fontSize: 12)),
-        ),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final incomeAsync = ref.watch(projectedIncomeProvider);
+    final expensesAsync = ref.watch(projectedExpensesProvider);
+    final currencyFormat = NumberFormat.currency(locale: 'es_VE', symbol: '\$', decimalDigits: 0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SummaryCard(
+              title: "Ingreso Proyectado",
+              amount: incomeAsync.value ?? 0.0,
+              color: Colors.green,
+              icon: Icons.arrow_upward,
+              isLoading: incomeAsync.isLoading,
+              formatter: currencyFormat,
+            ),
+          ),
+          const Gap(15),
+          Expanded(
+            child: _SummaryCard(
+              title: "Gasto Proyectado",
+              amount: expensesAsync.value ?? 0.0,
+              color: Colors.red,
+              icon: Icons.arrow_downward,
+              isLoading: expensesAsync.isLoading,
+              formatter: currencyFormat,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _MenuCard extends StatelessWidget {
+class _SummaryCard extends StatelessWidget {
   final String title;
-  final IconData icon;
+  final double amount;
   final Color color;
-  final VoidCallback onTap;
-  const _MenuCard({required this.title, required this.icon, required this.color, required this.onTap});
+  final IconData icon;
+  final bool isLoading;
+  final NumberFormat formatter;
+
+  const _SummaryCard({
+    required this.title,
+    required this.amount,
+    required this.color,
+    required this.icon,
+    required this.isLoading,
+    required this.formatter,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: color.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        onTap: onTap,
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const Gap(10),
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const Gap(8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(color: colors.outline, fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const Gap(8),
+          if (isLoading)
+            const Center(child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+          else
+            SizedBox(
+              height: 28,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  formatter.format(amount),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: colors.onSurface),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
+}
+
+class _CirclePainter extends CustomPainter {
+  final Color backgroundColor;
+  final Color progressColor;
+  final double progress;
+
+  _CirclePainter({required this.backgroundColor, required this.progressColor, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = min(size.width / 2, size.height / 2);
+    const strokeWidth = 18.0;
+
+    // Círculo de fondo
+    final backgroundPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, backgroundPaint);
+
+    // Arco de progreso (gastos)
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    const startAngle = -pi / 2; // Empezar desde arriba
+    final sweepAngle = 2 * pi * progress.clamp(0.0, 1.0);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

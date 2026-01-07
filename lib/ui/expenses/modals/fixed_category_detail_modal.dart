@@ -2,103 +2,185 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import '../../../data/models/expense.dart';
-// ✅ Asegúrate de que este import coincida con la ruta del archivo que creaste en el paso A
+import '../../../data/models/category.dart'; // ✅ IMPORTACIÓN AÑADIDA
 import '../../../logic/models/category_with_expenses.dart'; 
 import '../../../logic/providers/database_providers.dart';
 import '../../../data/daos/expense_dao.dart';
+import '../../../date_utils.dart';
 import 'add_expense_modal.dart';
+import '../../shared/icon_mapper.dart'; // ✅ Esta ruta ya es correcta
+import 'create_category_modal.dart'; // Asumimos que este es tu modal para crear/editar categorías
+
+// ✅ 1. Se crea un provider que "observa" la lista de gastos de una categoría específica.
+// Cada vez que un gasto se añade, edita o borra, este provider lo notificará.
+final categoryExpensesProvider = StreamProvider.family<List<Expense>, int>((ref, categoryId) {
+  final expenseDao = ref.watch(expenseDaoProvider);
+  return expenseDao.watchExpensesForCategory(categoryId);
+});
 
 class FixedCategoryDetailModal extends ConsumerWidget {
-  final CategoryWithExpenses data;
+  // ✅ 2. El modal ahora solo necesita el ID de la categoría.
+  // Obtendrá los datos de forma reactiva desde los providers.
+  final int categoryId;
 
-  const FixedCategoryDetailModal({super.key, required this.data});
+  const FixedCategoryDetailModal({super.key, required this.categoryId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
-    final category = data.category;
     final expenseDao = ref.read(expenseDaoProvider);
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      child: Column(
-        children: [
-          // HEADER CATEGORÍA
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Color(category.colorValue).withOpacity(0.15),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  IconData(category.iconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
-                  color: Color(category.colorValue),
-                  size: 30,
-                ),
-                const Gap(15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(category.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text("Gastos fijos ${_getFrequencyLabel(category.frequency)}", style: TextStyle(color: colors.outline)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+    // ✅ 3. Observamos los dos streams de datos que necesitamos.
+    // `ref.watch` reconstruirá este widget cuando cualquiera de los dos emita nuevos datos.
+    final expensesAsyncValue = ref.watch(categoryExpensesProvider(categoryId));
+    // Usamos el método `watchCategory` que añadiste a tu CategoryDao.
+    final categoryStream = ref.watch(categoryDaoProvider).watchCategory(categoryId);
 
-          // LISTA DE ITEMS (HIJOS)
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: data.expenses.length,
-              separatorBuilder: (c, i) => const Gap(12),
-              itemBuilder: (context, index) {
-                final expense = data.expenses[index];
-                return _ExpenseChildItem(expense: expense, expenseDao: expenseDao);
-              },
-            ),
-          ),
+    return StreamBuilder<Category?>(
+      stream: categoryStream,
+      builder: (context, categorySnapshot) {
+        // Mientras los datos cargan o si hay un error, mostramos un indicador.
+        if (!categorySnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final category = categorySnapshot.data;
+        if (category == null) {
+          // Esto puede pasar si la categoría se borra mientras el modal está abierto.
+          // Cerramos el modal para evitar errores.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if(context.mounted) Navigator.of(context).pop();
+          });
+          return const SizedBox.shrink();
+        }
 
-          // BOTÓN AGREGAR ITEM A ESTA CATEGORÍA
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (ctx) => AddExpenseModal(preSelectedCategory: category),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: Text("Agregar Item a ${category.name}"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: colors.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            children: [
+              // HEADER CATEGORÍA
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Color(category.colorValue).withOpacity(0.15),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      getIconFromCode(category.iconCode),
+                      color: Color(category.colorValue),
+                      size: 30,
+                    ),
+                    const Gap(15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(category.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          Text(getFrequencyLabel(category.frequency), style: TextStyle(color: colors.outline, letterSpacing: 1.2)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_note_outlined),
+                      tooltip: "Editar Categoría",
+                      onPressed: () {
+                        Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          builder: (context) => CreateCategoryModal(categoryToEdit: category),
+                        );
+                      },
+                    ),
+                    // ✅ BOTÓN DE BORRADO DE CATEGORÍA
+                    IconButton(
+                      icon: Icon(Icons.delete_forever_outlined, color: colors.error),
+                      tooltip: "Eliminar Categoría",
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text("¿Eliminar categoría?"),
+                            content: Text(
+                                "Se borrará la categoría '${category.name}', todos sus pagos asociados y su historial de transacciones.\n\nEsta acción no se puede deshacer."),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: Text("Eliminar", style: TextStyle(color: colors.error))),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true && context.mounted) {
+                          // El modal se cerrará automáticamente porque el stream de `category` emitirá null.
+                          await ref.read(expenseDaoProvider).deleteCategoryAndRelatedData(categoryId);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Categoría eliminada con éxito.")));
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  String _getFrequencyLabel(dynamic freq) {
-    if (freq == null) return "MENSUAL";
-    return freq.toString().split('.').last.toUpperCase();
+              // LISTA DE ITEMS (HIJOS)
+              Expanded(
+                // Usamos .when para manejar los estados de carga/error del stream de gastos
+                child: expensesAsyncValue.when(
+                  data: (expenses) {
+                    if (expenses.isEmpty) {
+                      return const Center(child: Text("No hay pagos en esta categoría."));
+                    }
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(20),
+                      itemCount: expenses.length,
+                      separatorBuilder: (c, i) => const Gap(12),
+                      itemBuilder: (context, index) {
+                        final expense = expenses[index];
+                        return _ExpenseChildItem(expense: expense, expenseDao: expenseDao);
+                      },
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) => Center(child: Text("Error: $err")),
+                ),
+              ),
+
+              // BOTÓN AGREGAR ITEM A ESTA CATEGORÍA
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (ctx) => AddExpenseModal(preSelectedCategory: category),
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: Text("Agregar Item a ${category.name}"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

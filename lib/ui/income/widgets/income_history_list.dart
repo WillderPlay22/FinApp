@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/transaction.dart';
+import '../../shared/icon_mapper.dart';
 import '../../../logic/providers/database_providers.dart';
 
 class IncomeHistoryList extends ConsumerWidget {
@@ -79,7 +80,7 @@ class IncomeHistoryList extends ConsumerWidget {
                   leading: CircleAvatar(
                     backgroundColor: Colors.green.withOpacity(0.1), // Corrección opacidad
                     child: Icon(
-                      IconData(transaction.categoryIconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
+                      getIconFromCode(transaction.categoryIconCode),
                       color: Colors.green,
                       size: 20,
                     ),

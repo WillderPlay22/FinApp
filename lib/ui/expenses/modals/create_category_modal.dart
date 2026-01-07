@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
+import 'package:isar/isar.dart';
 import '../../../data/models/category.dart';
 import '../../../data/models/enums.dart';
 import '../../../logic/providers/database_providers.dart';
+import '../../shared/icon_mapper.dart'; // ✅ Esta ruta ya es correcta
 
 class CreateCategoryModal extends ConsumerStatefulWidget {
-  const CreateCategoryModal({super.key});
+  // ✅ 1. AÑADIMOS EL PARÁMETRO PARA RECIBIR LA CATEGORÍA A EDITAR
+  final Category? categoryToEdit;
+
+  const CreateCategoryModal({super.key, this.categoryToEdit});
 
   @override
   ConsumerState<CreateCategoryModal> createState() => _CreateCategoryModalState();
@@ -15,11 +20,27 @@ class CreateCategoryModal extends ConsumerStatefulWidget {
 
 class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
   final _nameController = TextEditingController();
-  
+
+  // ✅ 2. UN GETTER PARA SABER FÁCILMENTE SI ESTAMOS EDITANDO
+  bool get isEditing => widget.categoryToEdit != null;
+
   // Selección por defecto
   int _selectedIconCode = FontAwesomeIcons.tag.codePoint;
   Color _selectedColor = Colors.blue;
   Frequency _selectedFrequency = Frequency.monthly;
+
+  // ✅ 3. RELLENAMOS LOS DATOS SI ESTAMOS EDITANDO
+  @override
+  void initState() {
+    super.initState();
+    if (isEditing) {
+      final category = widget.categoryToEdit!;
+      _nameController.text = category.name;
+      _selectedIconCode = category.iconCode;
+      _selectedColor = Color(category.colorValue);
+      _selectedFrequency = category.frequency ?? Frequency.monthly;
+    }
+  }
 
   // LISTA DE ICONOS DISPONIBLES
   final List<IconData> _icons = [
@@ -53,28 +74,30 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
         color: colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text("Nueva Categoría", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colors.primary), textAlign: TextAlign.center),
-          const Gap(20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ✅ 4. CAMBIAMOS EL TÍTULO DINÁMICAMENTE
+            Text(isEditing ? "Editar Categoría" : "Nueva Categoría", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colors.primary), textAlign: TextAlign.center),
+            const Gap(20),
 
           // 1. NOMBRE
           TextField(
             controller: _nameController,
             decoration: InputDecoration(
               labelText: "Nombre de la Categoría",
-              prefixIcon: Icon(IconData(_selectedIconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'), color: _selectedColor),
+              prefixIcon: Icon(getIconFromCode(_selectedIconCode), color: _selectedColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
               filled: true,
               fillColor: colors.surfaceContainerHighest.withOpacity(0.3),
             ),
           ),
-          const Gap(20),
+            const Gap(20),
 
-          // 2. SELECTOR DE FRECUENCIA
-          Row(
+            // 2. SELECTOR DE FRECUENCIA
+            Row(
             children: [
               const Text("Frecuencia:", style: TextStyle(fontWeight: FontWeight.bold)),
               const Gap(10),
@@ -95,16 +118,16 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
                 ),
               ),
             ],
-          ),
-          const Gap(5),
-          Text("Define cada cuánto se renuevan los gastos fijos de esta categoría.", style: TextStyle(fontSize: 10, color: colors.outline)),
+            ),
+            const Gap(5),
+            Text("Define cada cuánto se renuevan los gastos fijos de esta categoría.", style: TextStyle(fontSize: 10, color: colors.outline)),
 
-          const Gap(20),
+            const Gap(20),
 
-          // 3. SELECTOR DE COLORES
-          const Text("Color:", style: TextStyle(fontWeight: FontWeight.bold)),
-          const Gap(10),
-          SizedBox(
+            // 3. SELECTOR DE COLORES
+            const Text("Color:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Gap(10),
+            SizedBox(
             height: 50,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -127,14 +150,14 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
                 );
               },
             ),
-          ),
+            ),
 
-          const Gap(20),
+            const Gap(20),
 
-          // 4. SELECTOR DE ICONOS (GRID)
-          const Text("Icono:", style: TextStyle(fontWeight: FontWeight.bold)),
-          const Gap(10),
-          SizedBox(
+            // 4. SELECTOR DE ICONOS (GRID)
+            const Text("Icono:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Gap(10),
+            SizedBox(
             height: 150, // Altura limitada para el grid
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -159,22 +182,24 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
                 );
               },
             ),
-          ),
-
-          const Gap(20),
-
-          // 5. BOTÓN GUARDAR
-          ElevatedButton(
-            onPressed: _saveCategory,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _selectedColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 15),
             ),
-            child: const Text("Guardar Categoría", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const Gap(20),
-        ],
+
+            const Gap(20),
+
+            // 5. BOTÓN GUARDAR
+            ElevatedButton(
+              onPressed: _saveCategory,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _selectedColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              // ✅ 5. CAMBIAMOS EL TEXTO DEL BOTÓN
+              child: Text(isEditing ? "Guardar Cambios" : "Guardar Categoría", style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const Gap(20),
+          ],
+        ),
       ),
     );
   }
@@ -185,16 +210,17 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
       return;
     }
 
-    final newCategory = Category(
+    // ✅ 6. LÓGICA DE GUARDADO (CREAR O ACTUALIZAR)
+    final category = Category(
       name: _nameController.text,
       iconCode: _selectedIconCode,
       colorValue: _selectedColor.value,
       frequency: _selectedFrequency,
       isExpense: true,
-    );
+    )..id = widget.categoryToEdit?.id ?? Isar.autoIncrement; // Si editamos, usamos el ID existente
 
     // Guardamos en BD
-    ref.read(categoryDaoProvider).addCategory(newCategory);
+    ref.read(categoryDaoProvider).addCategory(category);
 
     Navigator.pop(context); // Cerramos el modal
   }

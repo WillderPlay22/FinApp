@@ -1,201 +1,364 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+import '../../date_utils.dart';
 import '../local_db/isar_db.dart';
-import '../models/expense.dart';
 import '../models/category.dart';
+import '../models/expense.dart';
 import '../models/transaction.dart';
 import '../models/enums.dart';
+import '../../logic/providers/time_provider.dart';
 
-// Clase auxiliar para el estado del ciclo
+/// Clase de estado para saber si un gasto fijo está pagado en el ciclo actual.
 class CycleStatus {
-  final double totalSpent; 
-  final int paymentCount;  
-  final bool isFullyPaid;  
+  final double totalSpent;
+  final int paymentCount;
+  final bool isFullyPaid;
 
   CycleStatus({
-    required this.totalSpent, 
-    required this.paymentCount, 
-    required this.isFullyPaid
+    this.totalSpent = 0,
+    this.paymentCount = 0,
+    this.isFullyPaid = false,
   });
 }
 
 class ExpenseDao {
   final IsarService isarService;
+  final Ref ref; // Referencia de Riverpod para acceder a otros providers
 
-  ExpenseDao(this.isarService);
+  ExpenseDao(this.isarService, this.ref);
 
-  // 1. GUARDAR O EDITAR
-  Future<void> saveExpense({
-    int? id,
-    required String title,
-    required double amount,
-    required DateTime date,
-    required Category category,
-    required bool isFixed,
-    required Frequency frequency,
-  }) async {
+  /// ✅ LÓGICA CLAVE: Marca un gasto fijo como pagado.
+  /// Crea una transacción en el historial.
+  Future<void> markFixedExpenseAsPaid(Expense expense) async {
     final isar = await isarService.db;
+    final now = ref.read(nowProvider); // Usamos la fecha de la app (real o simulada)
+    final category = expense.category.value;
+
+    if (category == null) return; // Chequeo de seguridad
+
+    final transaction = FinancialTransaction()
+      ..amount = expense.amount
+      ..date = now
+      ..note = expense.title // El nombre del item es la nota de la transacción
+      ..type = TransactionType.expense
+      ..isRecurring = true
+      ..categoryName = category.name
+      ..categoryIconCode = category.iconCode
+      ..colorValue = category.colorValue
+      ..relatedExpense.value = expense; // Enlazamos la transacción al gasto fijo original
+
     await isar.writeTxn(() async {
-      if (isFixed) {
+      await isar.financialTransactions.put(transaction);
+      await transaction.relatedExpense.save(); // Guardamos el enlace
+    });
+  }
+
+  /// ✅ LÓGICA CLAVE: Observa el estado de un gasto para el ciclo actual.
+  /// Emite un nuevo `CycleStatus` cada vez que los datos relevantes cambian.
+  Stream<CycleStatus> watchCycleStatus(Expense expense) async* {
+    final isar = await isarService.db;
+    final category = expense.category.value;
+
+    // Si no hay categoría o frecuencia, no se puede calcular el ciclo.
+    if (category == null || category.frequency == null) {
+      yield CycleStatus(); // Devuelve estado por defecto (no pagado)
+      return;
+    }
+
+    // Creamos una consulta que observa las transacciones de este gasto específico.
+    final query = isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(expense.id)).build();
+
+    // `watch(fireImmediately: true)` emite un valor inicial y luego cada vez que la consulta cambia.
+    await for (final _ in query.watch(fireImmediately: true)) {
+      // Cada vez que hay un cambio, recalculamos todo.
+      final now = ref.read(nowProvider);
+      final cycleRange = getCycleDateRange(now, category.frequency!);
+
+      // Buscamos las transacciones de este gasto DENTRO del ciclo de fechas actual.
+      final transactionsInCycle = await isar.financialTransactions
+          .filter()
+          .relatedExpense((q) => q.idEqualTo(expense.id))
+          .dateBetween(cycleRange.start, cycleRange.end, includeLower: true, includeUpper: true)
+          .findAll();
+
+      final isPaid = transactionsInCycle.isNotEmpty;
+      final paymentCount = transactionsInCycle.length;
+      final totalSpent = transactionsInCycle.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+
+      yield CycleStatus(
+        totalSpent: totalSpent,
+        paymentCount: paymentCount,
+        isFullyPaid: isPaid,
+      );
+    }
+  }
+
+  // --- OTROS MÉTODOS DEL DAO ---
+
+  // Guarda o actualiza un gasto (usado por AddExpenseModal)
+  Future<void> saveExpense(
+      {Id? id,
+      required String title,
+      required double amount,
+      required DateTime date,
+      required Category category,
+      required bool isFixed,
+      required Frequency frequency}) async {
+    final isar = await isarService.db;
+
+    if (isFixed) {
+      // Lógica original para gastos fijos: solo se guarda la "plantilla" del gasto.
+      final expense = Expense(
+        title: title,
+        amount: amount,
+        date: date,
+        isRecurring: true,
+        frequency: frequency,
+      )
+        ..id = id ?? Isar.autoIncrement
+        ..category.value = category;
+
+      await isar.writeTxn(() async {
+        await isar.expenses.put(expense);
+        await expense.category.save();
+      });
+    } else {
+      // ✅ Lógica corregida para gastos extras (no recurrentes).
+      // Se crea/actualiza un 'Expense' y su 'FinancialTransaction' correspondiente.
+      await isar.writeTxn(() async {
+        // 1. Guardar el objeto Expense. Actúa como "master" para poder editarlo.
         final expense = Expense(
           title: title,
           amount: amount,
           date: date,
-          isRecurring: true,
-          frequency: frequency,
-        );
-        if (id != null) expense.id = id;
+          isRecurring: false,
+          frequency: Frequency.none, // No aplica
+        )
+          ..id = id ?? Isar.autoIncrement
+          ..category.value = category;
+
         await isar.expenses.put(expense);
-        expense.category.value = category;
         await expense.category.save();
-      } else {
-        final transaction = FinancialTransaction()
-          ..amount = amount
-          ..note = title
-          ..date = date
+
+        // 2. Buscar si ya existe una transacción ligada a este gasto.
+        FinancialTransaction? transaction;
+        if (id != null) {
+          transaction = await isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(id)).findFirst();
+        }
+        transaction ??= FinancialTransaction();
+
+        // 3. Poblar/actualizar la transacción con los datos del 'Expense' y guardarla.
+        transaction
+          ..amount = expense.amount
+          ..date = expense.date
+          ..note = expense.title
           ..type = TransactionType.expense
+          ..isRecurring = false
           ..categoryName = category.name
           ..categoryIconCode = category.iconCode
           ..colorValue = category.colorValue
-          ..parentRecurringId = null;
+          ..relatedExpense.value = expense; // Enlazamos
+
         await isar.financialTransactions.put(transaction);
-      }
+        await transaction.relatedExpense.save();
+      });
+    }
+  }
+
+  // Actualiza un gasto (usado en el diálogo de edición simple)
+  Future<void> updateExpense(Expense expense) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      await isar.expenses.put(expense);
     });
   }
 
-  // 2. LEER GASTOS FIJOS
+  // Borra un gasto y sus transacciones asociadas
+  Future<void> deleteExpense(Id expenseId) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      // Borra las transacciones del historial que pertenecen a este gasto
+      await isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(expenseId)).deleteAll();
+      // Borra el gasto
+      await isar.expenses.filter().idEqualTo(expenseId).deleteAll();
+    });
+  }
+
+  // Borra una categoría, sus gastos asociados y las transacciones de esos gastos.
+  Future<void> deleteCategoryAndRelatedData(Id categoryId) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      // 1. Encontrar todos los gastos de esta categoría
+      final expensesToDelete = await isar.expenses.filter().category((q) => q.idEqualTo(categoryId)).findAll();
+      final expenseIds = expensesToDelete.map((e) => e.id).toList();
+
+      if (expenseIds.isNotEmpty) {
+        // 2. Borrar todas las transacciones que apuntan a esos gastos
+        await isar.financialTransactions
+            .filter()
+            .anyOf(expenseIds, (q, int id) => q.relatedExpense((r) => r.idEqualTo(id)))
+            .deleteAll();
+        
+        // 3. Borrar todos los gastos de la categoría
+        await isar.expenses.deleteAll(expenseIds);
+      }
+
+      // 4. Finalmente, borrar la categoría
+      await isar.categorys.delete(categoryId);
+    });
+  }
+
+  // Borra una transacción individual del historial
+  Future<void> deleteTransaction(Id transactionId) async {
+    final isar = await isarService.db;
+    await isar.writeTxn(() async {
+      await isar.financialTransactions.filter().idEqualTo(transactionId).deleteAll();
+    });
+  }
+
+  // Observa todos los gastos fijos (para la lista principal)
   Stream<List<Expense>> watchFixedExpenses() async* {
     final isar = await isarService.db;
     yield* isar.expenses.filter().isRecurringEqualTo(true).watch(fireImmediately: true);
   }
 
-  // 3. PAGAR (Registra la transacción)
-  Future<void> markFixedExpenseAsPaid(Expense expense, {double? customAmount}) async {
+  // Observa los gastos de una categoría específica
+  Stream<List<Expense>> watchExpensesForCategory(int categoryId) async* {
     final isar = await isarService.db;
-    final now = DateTime.now();
-
-    final newTx = FinancialTransaction()
-      ..amount = customAmount ?? expense.amount
-      ..note = expense.title 
-      ..date = now 
-      ..type = TransactionType.expense
-      ..categoryName = expense.category.value?.name ?? 'Sin categoría'
-      ..categoryIconCode = expense.category.value?.iconCode ?? 0
-      ..colorValue = expense.category.value?.colorValue ?? 0xFF000000
-      ..parentRecurringId = expense.id; 
-
-    await isar.writeTxn(() async {
-      await isar.financialTransactions.put(newTx);
-    });
+    yield* isar.expenses.filter().category((q) => q.idEqualTo(categoryId)).watch(fireImmediately: true);
   }
 
-  // ✅ 4. ESTADO DEL CICLO (Lógica Corregida)
-  Stream<CycleStatus> watchCycleStatus(Expense expense) async* {
+  // ✅ Observa el historial de transacciones de gastos para un período específico.
+  Stream<List<FinancialTransaction>> watchExpenseTransactionsInDateRange(DateRange range) async* {
     final isar = await isarService.db;
-    final now = DateTime.now();
-    
-    DateTime start, end;
-    
-    // ⚠️ CORRECCIÓN: El límite es SIEMPRE 1 pago por ciclo
-    int maxPayments = 1; 
-
-    // A. Definir el Rango de Fechas (La "Ventana" de Pago)
-    switch (expense.frequency) {
-      case Frequency.weekly:
-        // De Lunes a Domingo de la semana ACTUAL
-        start = now.subtract(Duration(days: now.weekday - 1));
-        start = DateTime(start.year, start.month, start.day); // Inicio del día (00:00)
-        end = start.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59)); // Fin del domingo
-        break;
-
-      case Frequency.biweekly:
-        // Quincenas estrictas: 1-15 o 16-Fin
-        if (now.day <= 15) {
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month, 15, 23, 59, 59);
-        } else {
-          start = DateTime(now.year, now.month, 16);
-          end = DateTime(now.year, now.month + 1, 0, 23, 59, 59); // Día 0 del mes siguiente = último de este
-        }
-        break;
-
-      case Frequency.monthly:
-      case Frequency.yearly: // Tratamos anual como mensual por simplicidad visual
-      default:
-        // Todo el Mes Actual
-        start = DateTime(now.year, now.month, 1);
-        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-        break;
-    }
-
-    // B. Contar pagos en esa ventana
     yield* isar.financialTransactions
+        .where()
         .filter()
-        .parentRecurringIdEqualTo(expense.id)
-        .and()
-        .dateBetween(start, end)
-        .watch(fireImmediately: true)
-        .map((transactions) {
-          double totalSpent = transactions.fold(0.0, (sum, t) => sum + t.amount);
-          int count = transactions.length;
-          
-          return CycleStatus(
-            totalSpent: totalSpent,
-            paymentCount: count,
-            // Si ya hay al menos 1 pago, está cubierto.
-            isFullyPaid: count >= maxPayments 
-          );
-        });
+        .typeEqualTo(TransactionType.expense)
+        .dateBetween(range.start, range.end)
+        .sortByDateDesc()
+        .watch(fireImmediately: true);
   }
 
-  // ... (Resto de métodos: watchTotalExecuted, watchTotalProjected, history, delete... igual que antes)
-  // Te los incluyo resumidos para que el archivo esté completo si copias todo:
+  // --- MÉTODOS PARA LOS GRÁFICOS ---
 
+  /// ✅ Observa el resumen de gastos EJECUTADOS y los agrupa por categoría para un rango de fechas.
+  /// Usado por el gráfico en la pestaña "Historial".
+  Stream<Map<String, ({double total, int color})>> watchCategorizedSummaryInDateRange(DateRange range) async* {
+    final isar = await isarService.db;
+    final query = isar.financialTransactions
+        .filter()
+        .typeEqualTo(TransactionType.expense)
+        .dateBetween(range.start, range.end)
+        .build();
+
+    await for (final transactions in query.watch(fireImmediately: true)) {
+      final Map<String, ({double total, int color})> summaryMap = {};
+      if (transactions.isEmpty) {
+        yield summaryMap;
+        continue;
+      }
+
+      for (final tx in transactions) {
+        final current = summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
+        summaryMap[tx.categoryName] = (total: current.total + tx.amount, color: tx.colorValue);
+      }
+      yield summaryMap;
+    }
+  }
+
+  /// ✅ Observa la PROYECCIÓN de gastos fijos y los agrupa por categoría.
+  /// Usado como una de las fuentes para el gráfico en la pestaña "Categorías".
+  Stream<Map<String, ({double total, int color})>> watchCategorizedFixedProjection() async* {
+    final isar = await isarService.db;
+    final query = isar.expenses.filter().isRecurringEqualTo(true).build();
+    await for (final fixedExpenses in query.watch(fireImmediately: true)) {
+      final Map<String, ({double total, int color})> projectionMap = {};
+      for (final expense in fixedExpenses) {
+        final category = expense.category.value;
+        if (category == null) continue;
+        final monthlyAmount = getMonthlyAmount(expense);
+        final current = projectionMap[category.name] ?? (total: 0.0, color: category.colorValue);
+        projectionMap[category.name] = (total: current.total + monthlyAmount, color: category.colorValue);
+      }
+      yield projectionMap;
+    }
+  }
+
+  /// ✅ Observa los gastos EXTRA (no recurrentes) en un rango de fechas y los agrupa por categoría.
+  /// Usado como fuente para el gráfico en la pestaña "Categorías".
+  Stream<Map<String, ({double total, int color})>> watchCategorizedExtrasInDateRange(DateRange range) async* {
+    final isar = await isarService.db;
+    final query = isar.financialTransactions.filter().typeEqualTo(TransactionType.expense).isRecurringEqualTo(false).dateBetween(range.start, range.end).build();
+
+    await for (final transactions in query.watch(fireImmediately: true)) {
+      final Map<String, ({double total, int color})> summaryMap = {};
+      for (final tx in transactions) {
+        final current = summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
+        summaryMap[tx.categoryName] = (total: current.total + tx.amount, color: tx.colorValue);
+      }
+      yield summaryMap;
+    }
+  }
+
+  // --- MÉTODOS PARA EL HEADER DE RESUMEN ---
+
+  /// Observa el total de gastos REALES ejecutados en el mes actual.
   Stream<double> watchTotalExecutedThisMonth() async* {
     final isar = await isarService.db;
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, 1);
-    final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-    yield* isar.financialTransactions.filter().typeEqualTo(TransactionType.expense).dateBetween(start, end).watch(fireImmediately: true)
-        .map((txs) => txs.fold(0.0, (sum, item) => sum + item.amount));
+    final now = ref.read(nowProvider);
+    final monthRange = getCycleDateRange(now, Frequency.monthly);
+
+    final query = isar.financialTransactions
+        .filter()
+        .typeEqualTo(TransactionType.expense)
+        .dateBetween(monthRange.start, monthRange.end)
+        .build();
+
+    await for (final transactions in query.watch(fireImmediately: true)) {
+      final total = transactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+      yield total;
+    }
   }
 
+  /// Observa el total de gastos PROYECTADO para el mes actual.
   Stream<double> watchTotalProjectedThisMonth() async* {
     final isar = await isarService.db;
-    final fixedStream = isar.expenses.filter().isRecurringEqualTo(true).watch(fireImmediately: true);
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, 1);
-    final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-    yield* fixedStream.asyncMap((fixedExpenses) async {
-       double projectedFixed = 0.0;
-       for (var e in fixedExpenses) {
-         if (e.frequency == Frequency.weekly) projectedFixed += (e.amount * 4);
-         else if (e.frequency == Frequency.biweekly) projectedFixed += (e.amount * 2);
-         else projectedFixed += e.amount; 
-       }
-       final extras = await isar.financialTransactions.filter().typeEqualTo(TransactionType.expense).parentRecurringIdIsNull().dateBetween(start, end).findAll();
-       double executedExtras = extras.fold(0.0, (sum, item) => sum + item.amount);
-       return projectedFixed + executedExtras;
-    });
+    final query = isar.expenses.where().build();
+
+    await for (final _ in query.watch(fireImmediately: true)) {
+      double projectedTotal = 0;
+      // 1. Sumar la proyección de todos los gastos fijos
+      final fixedExpenses = await isar.expenses.filter().isRecurringEqualTo(true).findAll();
+      for (final expense in fixedExpenses) {
+        projectedTotal += getMonthlyAmount(expense);
+      }
+
+      // 2. Sumar los gastos extra (no recurrentes) ya ejecutados este mes
+      final now = ref.read(nowProvider);
+      final monthRange = getCycleDateRange(now, Frequency.monthly);
+      final extraTransactions = await isar.financialTransactions
+        .filter()
+        .isRecurringEqualTo(false)
+        .typeEqualTo(TransactionType.expense)
+        .dateBetween(monthRange.start, monthRange.end)
+        .findAll();
+      projectedTotal += extraTransactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+
+      yield projectedTotal;
+    }
   }
 
-  Stream<List<FinancialTransaction>> watchExpenseHistory() async* {
-    final isar = await isarService.db;
-    yield* isar.financialTransactions.filter().typeEqualTo(TransactionType.expense).sortByDateDesc().watch(fireImmediately: true);
-  }
-
-  Stream<List<FinancialTransaction>> watchHistoryForExpense(int expenseId) async* {
-    final isar = await isarService.db;
-    yield* isar.financialTransactions.filter().parentRecurringIdEqualTo(expenseId).sortByDateDesc().watch(fireImmediately: true);
-  }
-
-  Future<void> deleteExpense(int id) async {
-    final isar = await isarService.db;
-    await isar.writeTxn(() async => await isar.expenses.delete(id));
-  }
-
-  Future<void> deleteTransaction(int id) async {
-    final isar = await isarService.db;
-    await isar.writeTxn(() async => await isar.financialTransactions.delete(id));
+  // Helper para calcular el valor mensual de un gasto fijo
+  double getMonthlyAmount(Expense expense) {
+    switch (expense.frequency) {
+      case Frequency.daily: return expense.amount * 30;
+      case Frequency.weekly: return expense.amount * 4;
+      case Frequency.biweekly: return expense.amount * 2;
+      case Frequency.monthly: return expense.amount;
+      case Frequency.yearly: return expense.amount / 12;
+      case Frequency.none: default: return 0;
+    }
   }
 }

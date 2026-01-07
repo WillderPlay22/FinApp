@@ -5,15 +5,19 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
 class ExpensesSummaryHeader extends ConsumerStatefulWidget {
+  final bool isCategoryView;
   final AsyncValue<Map<String, ({double total, int color})>> chartData;
   final AsyncValue<double> projectedTotal;
   final AsyncValue<double> executedTotal;
+  final AsyncValue<double> historyTotal;
 
   const ExpensesSummaryHeader({
     super.key,
+    required this.isCategoryView,
     required this.chartData,
     required this.projectedTotal,
     required this.executedTotal,
+    required this.historyTotal,
   });
 
   @override
@@ -42,22 +46,47 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
           ),
           const Gap(16),
           // --- TARJETAS DE TOTALES ---
+          // ✅ Usamos AnimatedSwitcher para animar el cambio entre la vista de 2 tarjetas y 1 tarjeta.
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _SummaryCard(
-                  title: "Gastado (real)",
-                  amountAsync: widget.executedTotal,
-                  color: colors.error,
-                ),
-                const Gap(12),
-                _SummaryCard(
-                  title: "Proyectado del mes",
-                  amountAsync: widget.projectedTotal,
-                  color: colors.primary,
-                ),
-              ],
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              // Una transición que combina desvanecimiento y deslizamiento.
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.0, 0.3),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: widget.isCategoryView
+                  // VISTA PARA LA PESTAÑA "CATEGORÍAS" (2 tarjetas)
+                  ? Column(
+                      key: const ValueKey('category_cards'),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _SummaryCard(
+                          title: "Gastado (real)",
+                          amountAsync: widget.executedTotal,
+                          color: colors.error, // Rojo para gastos
+                        ),
+                        const Gap(12),
+                        _SummaryCard(
+                          title: "Proyectado del mes",
+                          amountAsync: widget.projectedTotal,
+                          color: colors.primary, // Azul/Morado para proyección
+                        ),
+                      ],
+                    )
+                  // VISTA PARA LA PESTAÑA "HISTORIAL" (1 tarjeta)
+                  : Center(
+                      key: const ValueKey('history_card'),
+                      child: _SummaryCard(title: "Total del Periodo", amountAsync: widget.historyTotal, color: colors.tertiary), // Otro color para el total
+                    ),
             ),
           ),
         ],
@@ -91,6 +120,9 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
           centerSpaceRadius: 45,
           sectionsSpace: 2,
         ),
+        // Animamos también el estado vacío para una transición suave.
+        swapAnimationDuration: const Duration(milliseconds: 800),
+        swapAnimationCurve: Curves.easeInOutCubic,
       );
     }
 
@@ -111,6 +143,12 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
         centerSpaceRadius: 45,
         sectionsSpace: 2,
       ),
+      // ✅ ¡AQUÍ ESTÁ LA MAGIA!
+      // Estas propiedades controlan la animación cuando los datos del gráfico cambian.
+      // Aumentamos la duración para que la transición sea más lenta y apreciable.
+      swapAnimationDuration: const Duration(milliseconds: 800), // Antes era el default (150ms), ahora es más lento.
+      // Usamos una curva suave para que la animación se vea fluida.
+      swapAnimationCurve: Curves.easeInOutCubic,
     );
   }
 }
@@ -127,17 +165,31 @@ class _SummaryCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 2);
 
+    // ✅ Se envuelve en un Container con constraints para asegurar tamaños consistentes.
     return Container(
+      width: double.infinity, // Asegura que ocupe todo el ancho disponible
+      constraints: const BoxConstraints(minHeight: 74), // Altura mínima para consistencia
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: colors.surfaceContainer, border: Border.all(color: colors.outlineVariant.withOpacity(0.2))),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        // ✅ Se añade un borde izquierdo con el color temático para darle énfasis.
+        border: Border(
+          left: BorderSide(
+            color: color,
+            width: 5,
+          ),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // Centra el contenido verticalmente
         children: [
           Text(title, style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
           const Gap(4),
           amountAsync.when(
             data: (amount) => Text(currencyFormat.format(amount), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
-            loading: () => const SizedBox(height: 24, child: LinearProgressIndicator()),
+            loading: () => const SizedBox(height: 24, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)))),
             error: (e, s) => Text("Error", style: TextStyle(color: colors.error)),
           ),
         ],

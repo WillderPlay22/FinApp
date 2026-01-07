@@ -67,6 +67,19 @@ final historyChartDataProvider = StreamProvider<Map<String, ({double total, int 
   return ref.watch(expenseDaoProvider).watchCategorizedSummaryInDateRange(range);
 });
 
+// Provider para el total del historial (Ejecutado en un rango)
+final historyTotalProvider = Provider<AsyncValue<double>>((ref) {
+  // Reutilizamos el provider del gráfico del historial para ser eficientes
+  final historyChartAsync = ref.watch(historyChartDataProvider);
+
+  // Cuando el provider del gráfico tenga datos, los sumamos.
+  return historyChartAsync.when(
+    data: (data) => AsyncValue.data(data.values.fold(0.0, (sum, e) => sum + e.total)),
+    loading: () => const AsyncValue.loading(),
+    error: (err, stack) => AsyncValue.error(err, stack),
+  );
+});
+
 // Providers para los totales, definidos fuera del build para eficiencia.
 // ✅ CORREGIDO: Se reemplaza el StreamProvider ineficiente por un Provider que combina streams existentes.
 // Esto evita recálculos innecesarios y soluciona el problema de la carga infinita.
@@ -122,20 +135,21 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    // Seleccionamos qué datos mostrar en el gráfico según la pestaña activa
-    final chartData = _tabController.index == 0
+    final isCategoryTab = _tabController.index == 0;
+    final chartData = isCategoryTab
         ? ref.watch(categoryChartDataProvider)
         : ref.watch(historyChartDataProvider);
-
-    // Obtenemos los totales para las tarjetas de resumen
     final projectedTotalAsync = ref.watch(projectedTotalProvider);
     final executedTotalAsync = ref.watch(executedTotalProvider);
+    final historyTotalAsync = ref.watch(historyTotalProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Gestión de Gastos"),
         centerTitle: true,
         bottom: TabBar(
+          // ✅ Se añade un key para que Flutter sepa que el TabBar en sí no cambia
+          key: const ValueKey('expenses_tab_bar'),
           controller: _tabController,
           tabs: const [
             Tab(text: "Categorías", icon: Icon(FontAwesomeIcons.layerGroup)),
@@ -146,9 +160,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
       body: Column(
         children: [
           ExpensesSummaryHeader(
+            isCategoryView: isCategoryTab,
             chartData: chartData,
             projectedTotal: projectedTotalAsync,
             executedTotal: executedTotalAsync,
+            historyTotal: historyTotalAsync,
           ),
           Expanded(
             child: TabBarView(

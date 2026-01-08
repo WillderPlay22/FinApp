@@ -5,7 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
 class ExpensesSummaryHeader extends ConsumerStatefulWidget {
-  final bool isCategoryView;
+  final int tabIndex; // Cambiado de bool a int
   final AsyncValue<Map<String, ({double total, int color})>> chartData;
   final AsyncValue<double> projectedTotal;
   final AsyncValue<double> executedTotal;
@@ -13,7 +13,7 @@ class ExpensesSummaryHeader extends ConsumerStatefulWidget {
 
   const ExpensesSummaryHeader({
     super.key,
-    required this.isCategoryView,
+    required this.tabIndex,
     required this.chartData,
     required this.projectedTotal,
     required this.executedTotal,
@@ -66,41 +66,69 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
                     ),
                   );
                 },
-                child: widget.isCategoryView
-                    // VISTA PARA LA PESTAÑA "CATEGORÍAS" (2 tarjetas)
-                    ? Column(
-                        key: const ValueKey('category_cards'),
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SummaryCard(
-                            title: "Gastado",
-                            amountAsync: widget.executedTotal,
-                            color: Colors.red.shade700,
-                          ),
-                          const Gap(12),
-                          _SummaryCard(
-                            title: "Proyectado del mes",
-                            amountAsync: widget.projectedTotal,
-                            color: Colors.blue.shade700,
-                          ),
-                        ],
-                      )
-                    // VISTA PARA LA PESTAÑA "HISTORIAL" (1 tarjeta)
-                    : Center(
-                        key: const ValueKey('history_card'),
-                        child: _SummaryCard(
-                          title: "Total del Periodo",
-                          amountAsync: widget.historyTotal,
-                          color: Colors.orange.shade800,
-                          isEnlarged: true, // ✅ Se pasa el flag para agrandar el contenido
-                        ),
-                      ),
-                  ),
+                child: _buildCardsForTab(widget.tabIndex),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // Widget auxiliar para construir las tarjetas según la pestaña
+  Widget _buildCardsForTab(int index) {
+    switch (index) {
+      // Pestaña "Categorías"
+      case 0:
+        return Column(
+          key: const ValueKey('category_cards'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SummaryCard(
+              title: "Gastado",
+              amountAsync: widget.executedTotal,
+              color: Colors.red.shade700,
+            ),
+            const Gap(12),
+            _SummaryCard(
+              title: "Proyectado del mes",
+              amountAsync: widget.projectedTotal,
+              color: Colors.blue.shade700,
+            ),
+          ],
+        );
+      // Pestaña "Deudas"
+      case 1:
+        return Column(
+          key: const ValueKey('debts_cards'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SummaryCard(
+              title: "Total de gastos pagados",
+              amountAsync: widget.executedTotal, // Placeholder
+              color: Colors.teal.shade700,
+            ),
+            const Gap(12),
+            _SummaryCard(
+              title: "Total de gastos pendientes",
+              amountAsync: widget.projectedTotal, // Placeholder
+              color: Colors.purple.shade700,
+            ),
+          ],
+        );
+      // Pestaña "Historial"
+      case 2:
+      default:
+        return Center(
+          key: const ValueKey('history_card'),
+          child: _SummaryCard(
+            title: "Total del Periodo",
+            amountAsync: widget.historyTotal,
+            color: Colors.orange.shade800,
+            isEnlarged: true,
+          ),
+        );
+    }
   }
 
   Widget _buildChart(BuildContext context, Map<String, ({double total, int color})> data) {

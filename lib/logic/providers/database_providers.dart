@@ -5,6 +5,8 @@ import '../../data/daos/recurring_dao.dart';
 // IMPORTAMOS LOS NUEVOS DAOS
 import '../../data/daos/expense_dao.dart';
 import '../../data/daos/category_dao.dart';
+import '../../data/daos/debt_dao.dart';
+import '../../data/models/debt.dart';
 
 // 1. Proveedor de la conexión a Base de Datos
 final isarServiceProvider = Provider<IsarService>((ref) {
@@ -41,4 +43,16 @@ final categoryDaoProvider = Provider<CategoryDao>((ref) {
 final expenseCategoriesProvider = StreamProvider((ref) {
   final dao = ref.watch(categoryDaoProvider);
   return dao.watchExpenseCategories();
+});
+
+// 7. Proveedor del DAO de Deudas (NUEVO)
+final debtDaoProvider = Provider<DebtDao>((ref) {
+  final isarService = ref.watch(isarServiceProvider);
+  return DebtDao(isarService, ref);
+});
+
+// 8. Proveedor del Stream de Deudas (NUEVO)
+final allDebtsProvider = StreamProvider<List<Debt>>((ref) {
+  final dao = ref.watch(debtDaoProvider);
+  return dao.watchAllDebts();
 });

@@ -6,8 +6,10 @@ import 'package:finapp/date_utils.dart';
 import 'package:finapp/logic/providers/database_providers.dart';
 import 'package:finapp/logic/providers/time_provider.dart';
 import 'modals/add_expense_modal.dart';
+import 'modals/add_debt_modal.dart'; // Importar el nuevo modal de deudas
 import 'widgets/expense_history_list.dart';
 import 'widgets/expenses_summary_header.dart';
+import 'widgets/debts_list.dart'; // Importar la nueva pantalla de deudas
 import 'widgets/fixed_expenses_list.dart';
 
 // --- PROVIDERS ESPECÍFICOS PARA ESTA PANTALLA ---
@@ -123,7 +125,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this); // Cambiado a 3 pestañas
     // Se define y añade el listener.
     _tabListener = () => setState(() {});
     _tabController.addListener(_tabListener);
@@ -139,13 +141,21 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    final isCategoryTab = _tabController.index == 0;
-    final chartData = isCategoryTab
-        ? ref.watch(categoryChartDataProvider)
-        : ref.watch(historyChartDataProvider);
-    final projectedTotalAsync = ref.watch(projectedTotalProvider);
-    final executedTotalAsync = ref.watch(executedTotalProvider);
-    final historyTotalAsync = ref.watch(historyTotalProvider);
+    final tabIndex = _tabController.index;
+
+    // Lógica para determinar qué datos mostrar en el header según la pestaña
+    final AsyncValue<Map<String, ({double total, int color})>> chartData;
+    if (tabIndex == 0) {
+      chartData = ref.watch(categoryChartDataProvider);
+    } else if (tabIndex == 2) {
+      chartData = ref.watch(historyChartDataProvider);
+    } else {
+      chartData = const AsyncValue.data({}); // Placeholder para Deudas
+    }
+
+    final projectedTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(projectedTotalProvider);
+    final executedTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(executedTotalProvider);
+    final historyTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(historyTotalProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -155,8 +165,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           // ✅ Se añade un key para que Flutter sepa que el TabBar en sí no cambia
           key: const ValueKey('expenses_tab_bar'),
           controller: _tabController,
-          tabs: const [
+          tabs: const [ // Se añade la pestaña de Deudas
             Tab(text: "Categorías", icon: Icon(FontAwesomeIcons.layerGroup)),
+            Tab(text: "Deudas", icon: Icon(FontAwesomeIcons.fileInvoiceDollar)),
             Tab(text: "Historial", icon: Icon(FontAwesomeIcons.clockRotateLeft)),
           ],
         ),
@@ -164,7 +175,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
       body: Column(
         children: [
           ExpensesSummaryHeader(
-            isCategoryView: isCategoryTab,
+            tabIndex: tabIndex, // Se pasa el índice de la pestaña
             chartData: chartData,
             projectedTotal: projectedTotalAsync,
             executedTotal: executedTotalAsync,
@@ -173,16 +184,62 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [FixedExpensesList(), ExpenseHistoryList()],
+              children: const [ // Se añade la vista de Deudas
+                FixedExpensesList(), 
+                DebtsList(), 
+                ExpenseHistoryList()
+              ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet(context: context, isScrollControlled: true, useSafeArea: true, builder: (ctx) => const AddExpenseModal()),
-        label: const Text("Gasto Extra"),
-        icon: const Icon(Icons.add),
+      floatingActionButton: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return ScaleTransition(
+            scale: animation,
+            child: FadeTransition(opacity: animation, child: child),
+          );
+        },
+        child: _buildFabForTab(tabIndex),
       ),
     );
+  }
+
+  Widget _buildFabForTab(int index) {
+    switch (index) {
+      case 0: // Pestaña "Categorías"
+        return FloatingActionButton.extended(
+          key: const ValueKey('fab_gasto'),
+          onPressed: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            builder: (ctx) => const AddExpenseModal(),
+          ),
+          label: const Text("Gasto"),
+          icon: const Icon(Icons.add),
+          backgroundColor: Colors.red,
+        );
+      case 1: // Pestaña "Deudas"
+        return FloatingActionButton.extended(
+          key: const ValueKey('fab_deuda'),
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (ctx) => const AddDebtModal(),
+            );
+          }, 
+          label: const Text("Deuda"),
+          icon: const Icon(Icons.add),
+          backgroundColor: Colors.purple.shade700, // Color consistente con la tarjeta de deudas
+        );
+      case 2: // Pestaña "Historial"
+      default:
+        // Devuelve un widget vacío para que el botón desaparezca.
+        return const SizedBox.shrink(key: ValueKey('fab_empty'));
+    }
   }
 }

@@ -77,11 +77,11 @@ class _RecurringIncomeCard extends ConsumerWidget {
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           elevation: 0,
-          color: status.isFullyPaid 
-              ? Colors.green.withOpacity(0.1) 
-              : colors.surfaceContainerHighest.withOpacity(0.3),
+          color: status.isFullyPaid
+              ? Colors.green.withAlpha((255 * 0.1).round())
+              : colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
           shape: status.isFullyPaid 
-              ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.green.withOpacity(0.5)))
+              ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.green.withAlpha((255 * 0.5).round())))
               : null,
           child: ListTile(
             leading: CircleAvatar(

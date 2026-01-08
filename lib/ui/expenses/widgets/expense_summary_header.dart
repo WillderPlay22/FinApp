@@ -85,7 +85,7 @@ class _SummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: isFilled ? null : Border.all(color: theme.colorScheme.outlineVariant),
         boxShadow: isFilled 
-            ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))]
+            ? [BoxShadow(color: color.withAlpha((255 * 0.4).round()), blurRadius: 8, offset: const Offset(0, 4))]
             : null,
       ),
       child: Column(

@@ -49,7 +49,6 @@ DateRange getCycleDateRange(DateTime date, Frequency frequency) {
       end = DateTime(date.year, 12, 31, 23, 59, 59);
       break;
     case Frequency.none:
-    default: // Por seguridad, si llega una frecuencia no manejada, usa el día actual.
       start = DateTime(date.year, date.month, date.day);
       end = DateTime(date.year, date.month, date.day, 23, 59, 59);
       break;
@@ -70,8 +69,8 @@ String getFrequencyLabel(Frequency? freq) {
       return 'MENSUAL';
     case Frequency.yearly:
       return 'ANUAL';
-    case Frequency.none:
-    default:
+    case Frequency.none: // Se agrupan los casos para 'none' y 'null'.
+    case null:
       return 'SIN FRECUENCIA';
   }
 }

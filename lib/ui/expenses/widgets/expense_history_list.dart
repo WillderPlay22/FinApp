@@ -185,7 +185,7 @@ class _ExpenseHistoryItem extends StatelessWidget {
           Container(
             width: 45, height: 45,
             decoration: BoxDecoration(
-              color: Color(transaction.colorValue).withOpacity(0.2),
+              color: Color(transaction.colorValue).withAlpha((255 * 0.2).round()),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -227,7 +227,7 @@ class _ExpenseHistoryItem extends StatelessWidget {
                         transaction.categoryName, 
                         style: TextStyle(
                           fontSize: 11, 
-                          color: colors.primary.withOpacity(0.8), 
+                          color: colors.primary.withAlpha((255 * 0.8).round()), 
                           fontWeight: FontWeight.w600
                         ),
                         maxLines: 1,
@@ -317,7 +317,7 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
                 child: Text(
                   months[index][0].toUpperCase() + months[index].substring(1),
                   style: TextStyle(
-                    color: isEnabled ? colors.onSurface : colors.outline.withOpacity(0.5),
+                    color: isEnabled ? colors.onSurface : colors.outline.withAlpha((255 * 0.5).round()),
                   ),
                 ),
               ),

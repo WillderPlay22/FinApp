@@ -30,6 +30,7 @@ class FixedCategoryDetailModal extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: Color(category.colorValue).withOpacity(0.15),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             ),
@@ -135,6 +136,7 @@ class _ExpenseChildItem extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: colors.surfaceContainerHighest.withOpacity(0.3),
               borderRadius: BorderRadius.circular(12),
               border: isPaid ? Border.all(color: Colors.green, width: 1.5) : null,

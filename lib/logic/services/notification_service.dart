@@ -18,7 +18,6 @@ import '../../data/models/enums.dart';
 // 🛑 MANEJADOR BACKGROUND (App Cerrada)
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
-  print("🛑 BACKGROUND START: Acción -> ${response.actionId}");
 
   try {
     // 1. Inicialización de Flutter
@@ -47,8 +46,8 @@ void notificationTapBackground(NotificationResponse response) async {
     await service._handleActionLogic(db, response.actionId, response.payload);
 
   } catch (e, stackTrace) {
-    print("❌ ERROR CRÍTICO EN BACKGROUND: $e");
-    print("Stacktrace: $stackTrace");
+    debugPrint("❌ ERROR CRÍTICO EN BACKGROUND: $e");
+    debugPrint("Stacktrace: $stackTrace");
   }
 }
 
@@ -73,7 +72,6 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       const InitializationSettings(android: initializationSettingsAndroid),
       onDidReceiveNotificationResponse: (response) async {
-        print("🔔 FOREGROUND EVENT: ${response.actionId}");
         
         if (response.actionId == 'action_pay_yes' || response.actionId == 'action_postpone') {
            try {
@@ -81,7 +79,7 @@ class NotificationService {
              final db = await isarService.db; 
              await _handleActionLogic(db, response.actionId, response.payload);
            } catch (e) {
-             print("❌ Error en lógica foreground: $e");
+             debugPrint("❌ Error en lógica foreground: $e");
            }
         } else {
            selectNotificationStream.add(response.payload);
@@ -107,7 +105,6 @@ class NotificationService {
     final income = await db.recurringMovements.get(incomeId);
 
     if (income == null) {
-      print("⚠️ Ingreso ID $incomeId no encontrado.");
       return;
     }
 
@@ -124,11 +121,9 @@ class NotificationService {
     }
 
     if (actionId == 'action_pay_yes') {
-      print("✅ PROCESANDO PAGO AUTOMÁTICO: ${income.title}");
       await _processPayment(db, income, targetDate);
     
     } else if (actionId == 'action_postpone') {
-      print("💤 POSPONIENDO: ${income.title}");
       await _postponeNotification(income);
     }
   }
@@ -156,8 +151,6 @@ class NotificationService {
       await db.financialTransactions.put(newTx);
     });
     
-    print("✅ Transacción GUARDADA: \$$amount. Nota: $noteText");
-    
     await _scheduleNextForIncome(income);
   }
 
@@ -179,7 +172,6 @@ class NotificationService {
 
   Future<void> scheduleAllNotifications(List<RecurringMovement> incomes) async {
     await flutterLocalNotificationsPlugin.cancelAll(); 
-    print("🔄 Reprogramando ${incomes.length} alarmas limpias...");
     
     for (var income in incomes) {
       await _scheduleNextForIncome(income);
@@ -193,7 +185,6 @@ class NotificationService {
       double amount = _getAmountForDate(income, nextDate);
       
       final payload = "${income.id}|${nextDate.toIso8601String()}";
-      print("📅 Alarma: ${income.title} -> $nextDate (Monto: $amount)");
 
       await _scheduleZoneNotification(
         id: income.id,

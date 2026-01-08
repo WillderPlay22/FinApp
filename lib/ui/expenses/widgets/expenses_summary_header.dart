@@ -29,73 +29,81 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          // --- GRÁFICO DE DONA ---
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: widget.chartData.when(
-              data: (data) => _buildChart(context, data),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => const Center(child: Icon(Icons.error_outline)),
+      // ✅ Se envuelve el contenido en un SizedBox con altura fija para evitar el "salto" de la UI.
+      // La altura de 160px se elige para acomodar la configuración más alta (las dos tarjetas).
+      child: SizedBox(
+        height: 160,
+        child: Row(
+          children: [
+            // --- GRÁFICO DE DONA ---
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: widget.chartData.when(
+                data: (data) => _buildChart(context, data),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) => const Center(child: Icon(Icons.error_outline)),
+              ),
             ),
-          ),
-          const Gap(16),
-          // --- TARJETAS DE TOTALES ---
-          // ✅ Usamos AnimatedSwitcher para animar el cambio entre la vista de 2 tarjetas y 1 tarjeta.
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              // Una transición que combina desvanecimiento y deslizamiento.
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.0, 0.3),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
-              child: widget.isCategoryView
-                  // VISTA PARA LA PESTAÑA "CATEGORÍAS" (2 tarjetas)
-                  ? Column(
-                      key: const ValueKey('category_cards'),
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _SummaryCard(
-                          title: "Gastado (real)",
-                          amountAsync: widget.executedTotal,
-                          color: colors.error, // Rojo para gastos
-                        ),
-                        const Gap(12),
-                        _SummaryCard(
-                          title: "Proyectado del mes",
-                          amountAsync: widget.projectedTotal,
-                          color: colors.primary, // Azul/Morado para proyección
-                        ),
-                      ],
-                    )
-                  // VISTA PARA LA PESTAÑA "HISTORIAL" (1 tarjeta)
-                  : Center(
-                      key: const ValueKey('history_card'),
-                      child: _SummaryCard(title: "Total del Periodo", amountAsync: widget.historyTotal, color: colors.tertiary), // Otro color para el total
+            const Gap(16),
+            // --- TARJETAS DE TOTALES ---
+            // ✅ Usamos AnimatedSwitcher para animar el cambio entre la vista de 2 tarjetas y 1 tarjeta.
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                // Una transición que combina desvanecimiento y deslizamiento.
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.0, 0.3),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
                     ),
+                  );
+                },
+                child: widget.isCategoryView
+                    // VISTA PARA LA PESTAÑA "CATEGORÍAS" (2 tarjetas)
+                    ? Column(
+                        key: const ValueKey('category_cards'),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _SummaryCard(
+                            title: "Gastado",
+                            amountAsync: widget.executedTotal,
+                            color: Colors.red.shade700,
+                          ),
+                          const Gap(12),
+                          _SummaryCard(
+                            title: "Proyectado del mes",
+                            amountAsync: widget.projectedTotal,
+                            color: Colors.blue.shade700,
+                          ),
+                        ],
+                      )
+                    // VISTA PARA LA PESTAÑA "HISTORIAL" (1 tarjeta)
+                    : Center(
+                        key: const ValueKey('history_card'),
+                        child: _SummaryCard(
+                          title: "Total del Periodo",
+                          amountAsync: widget.historyTotal,
+                          color: Colors.orange.shade800,
+                          isEnlarged: true, // ✅ Se pasa el flag para agrandar el contenido
+                        ),
+                      ),
+                  ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildChart(BuildContext context, Map<String, ({double total, int color})> data) {
-    final totalValue = data.values.fold(0.0, (sum, e) => sum + e.total);
     final List<PieChartSectionData> sections = [];
     
     int i = 0;
@@ -116,7 +124,7 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
     if (sections.isEmpty) {
       return PieChart(
         PieChartData(
-          sections: [PieChartSectionData(value: 1, color: Theme.of(context).colorScheme.surfaceVariant, title: '', radius: 25)],
+          sections: [PieChartSectionData(value: 1, color: Theme.of(context).colorScheme.surfaceContainerHighest, title: '', radius: 25)],
           centerSpaceRadius: 45,
           sectionsSpace: 2,
         ),
@@ -157,40 +165,52 @@ class _SummaryCard extends StatelessWidget {
   final String title;
   final AsyncValue<double> amountAsync;
   final Color color;
+  final bool isEnlarged;
 
-  const _SummaryCard({required this.title, required this.amountAsync, required this.color});
+  const _SummaryCard({required this.title, required this.amountAsync, required this.color, this.isEnlarged = false});
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 2);
 
-    // ✅ Se envuelve en un Container con constraints para asegurar tamaños consistentes.
     return Container(
       width: double.infinity, // Asegura que ocupe todo el ancho disponible
       constraints: const BoxConstraints(minHeight: 74), // Altura mínima para consistencia
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: colors.surfaceContainer,
+        color: color,
         borderRadius: BorderRadius.circular(16),
-        // ✅ Se añade un borde izquierdo con el color temático para darle énfasis.
-        border: Border(
-          left: BorderSide(
-            color: color,
-            width: 5,
-          ),
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha((255 * 0.3).round()),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center, // Centra el contenido verticalmente
         children: [
-          Text(title, style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
-          const Gap(4),
+          Text(
+            title,
+            style: textTheme.labelMedium?.copyWith(
+              color: Colors.white.withAlpha((255 * 0.8).round()),
+              fontWeight: FontWeight.bold,
+              // Se agranda el título si la tarjeta es la principal
+              fontSize: isEnlarged ? 14 : 12,
+            ),
+          ),
+          Gap(isEnlarged ? 8 : 4), // Más espacio en la tarjeta grande
           amountAsync.when(
-            data: (amount) => Text(currencyFormat.format(amount), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
-            loading: () => const SizedBox(height: 24, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)))),
-            error: (e, s) => Text("Error", style: TextStyle(color: colors.error)),
+            data: (amount) => Text(
+              currencyFormat.format(amount),
+              style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+            ),
+            // Se agranda el indicador de carga y el texto de error
+            loading: () => SizedBox(height: isEnlarged ? 32 : 24, child: Center(child: SizedBox(width: isEnlarged ? 32 : 24, height: isEnlarged ? 32 : 24, child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)))),
+            error: (e, s) => const Text("Error", style: TextStyle(color: Colors.white70)),
           ),
         ],
       ),

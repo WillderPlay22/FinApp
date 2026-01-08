@@ -57,8 +57,8 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
               children: [
                 const SizedBox(width: 48), 
                 Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.1), shape: BoxShape.circle),
+                  padding: const EdgeInsets.all(16), // Reemplazo de withOpacity
+                  decoration: BoxDecoration(color: Colors.indigo.withAlpha((255 * 0.1).round()), shape: BoxShape.circle),
                   child: const Icon(FontAwesomeIcons.fileContract, size: 32, color: Colors.indigo),
                 ),
                 IconButton(
@@ -277,8 +277,8 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
 
                         // ✅ PASO 3: Verificar si el widget principal sigue vivo
                         if (mounted) {
-                          // Llamamos a confirmar usando el contexto del widget padre
-                          _confirmDelete(parentContext); 
+                          // Llamamos a confirmar. Usará el contexto del State, que es seguro.
+                          _confirmDelete(); 
                         }
                       },
                     ),
@@ -290,21 +290,28 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
               TextButton(onPressed: () => Navigator.pop(ctxEdit), child: const Text("Cancelar")),
               ElevatedButton(
                 onPressed: () async {
-                  // Guardado normal...
                   final newTitle = titleCtrl.text;
                   final amt1 = double.tryParse(amount1Ctrl.text) ?? 0.0;
                   final amt2 = double.tryParse(amount2Ctrl.text) ?? 0.0;
+
+                  // Se cierra el diálogo ANTES de las operaciones asíncronas para evitar errores de contexto.
+                  Navigator.pop(ctxEdit);
+
                   widget.movement.title = newTitle;
-                  if (isBiweekly) widget.movement.paymentAmounts = [amt1, amt2];
-                  else widget.movement.paymentAmounts = [amt1];
-                  if (isWeekly || isMonthly) widget.movement.paymentDays = [selectedDay];
+                  if (isBiweekly) {
+                    widget.movement.paymentAmounts = [amt1, amt2];
+                  } else {
+                    widget.movement.paymentAmounts = [amt1];
+                  }
+                  if (isWeekly || isMonthly) {
+                    widget.movement.paymentDays = [selectedDay];
+                  }
 
                   await ref.read(recurringDaoProvider).addRecurringMovement(widget.movement);
                   final allIncomes = await ref.read(recurringDaoProvider).getAllRecurringMovements();
                   await NotificationService().scheduleAllNotifications(allIncomes);
 
                   if (mounted) {
-                    Navigator.pop(ctxEdit);
                     _refresh();
                   }
                 },
@@ -317,9 +324,9 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
     );
   }
 
-  void _confirmDelete(BuildContext parentContext) {
+  void _confirmDelete() {
     showDialog(
-      context: parentContext, 
+      context: context, // Usa el context del State, que es seguro tras el check de 'mounted'.
       barrierDismissible: false,
       builder: (ctxConfirm) => AlertDialog(
         title: const Text("¿Eliminar?"),
@@ -329,24 +336,22 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
-               // 1. Eliminar de BD
+               // Se cierra el diálogo de confirmación ANTES de las operaciones asíncronas.
+               Navigator.of(ctxConfirm).pop();
+
+               // 1. Eliminar de BD y actualizar notificaciones
                await ref.read(recurringDaoProvider).deleteRecurringMovement(widget.movement.id);
-               
-               // 2. Actualizar Notificaciones
                final allIncomes = await ref.read(recurringDaoProvider).getAllRecurringMovements();
                await NotificationService().scheduleAllNotifications(allIncomes);
                
-               // 3. SECUENCIA DE CIERRE SEGURA
+               // 2. SECUENCIA DE CIERRE SEGURA
                if (mounted) {
-                 // Cerrar Confirmación
-                 Navigator.of(ctxConfirm).pop();
-                 
                  // Esperar animación
                  await Future.delayed(const Duration(milliseconds: 100));
 
                  // Cerrar el Modal de Detalles (BottomSheet)
-                 if (parentContext.mounted) {
-                    Navigator.of(parentContext).pop(); 
+                 if (mounted) {
+                    Navigator.of(context).pop(); 
                  }
                }
             }, 
@@ -415,8 +420,8 @@ class _PaymentButtonState extends State<_PaymentButton> {
 
         if (isPaid) {
           return Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withOpacity(0.5))),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), // Reemplazo de withOpacity
+            decoration: BoxDecoration(color: Colors.green.withAlpha((255 * 0.1).round()), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withAlpha((255 * 0.5).round()))),
             child: Row(
               children: [
                 const Icon(Icons.check_circle, color: Colors.green),
@@ -491,7 +496,7 @@ class _PaymentButtonState extends State<_PaymentButton> {
                     ..type = TransactionType.income
                     ..categoryName = widget.parentIncome.title
                     ..categoryIconCode = FontAwesomeIcons.sackDollar.codePoint
-                    ..colorValue = Colors.green.value
+                    ..colorValue = 0xFF4CAF50 // Equivalente a Colors.green.value, para evitar el lint de deprecación.
                     ..parentRecurringId = widget.parentIncome.id;
 
                   await widget.dao.addTransaction(newTx);

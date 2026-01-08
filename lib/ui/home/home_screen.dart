@@ -37,7 +37,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               Gap(20),
               Text("Balance Mensual Proyectado", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300)),
-              const Gap(20),
+              Gap(20),
               _AnalysisCircle(),
               Gap(40),
               _HomeSummaryCards(),

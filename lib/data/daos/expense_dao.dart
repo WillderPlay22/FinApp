@@ -358,7 +358,8 @@ class ExpenseDao {
       case Frequency.biweekly: return expense.amount * 2;
       case Frequency.monthly: return expense.amount;
       case Frequency.yearly: return expense.amount / 12;
-      case Frequency.none: default: return 0;
+      case Frequency.none:
+        return 0;
     }
   }
 }

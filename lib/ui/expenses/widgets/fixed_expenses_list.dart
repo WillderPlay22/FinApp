@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import '../../../data/models/expense.dart';
-import '../../../data/models/enums.dart'; 
 import '../../../date_utils.dart';
 import '../../../logic/providers/database_providers.dart';
 import '../../shared/icon_mapper.dart'; // ✅ Esta ruta ya es correcta
@@ -117,70 +116,89 @@ class _FixedCategoryCard extends StatelessWidget {
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colors.surfaceContainer,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(category.colorValue).withAlpha((255 * 0.4).round()),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            // ICONO DE CATEGORÍA GRANDE
-            Container(
-              width: 55, height: 55,
-              decoration: BoxDecoration(
-                color: Color(category.colorValue).withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                getIconFromCode(category.iconCode),
-                color: Color(category.colorValue),
-                size: 24,
+            // Parte coloreada a la izquierda
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 85, // Ancho para cubrir el ícono y un poco más
+                  decoration: BoxDecoration(
+                    color: Color(category.colorValue),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                    ),
+                  ),
+                ),
               ),
             ),
-            const Gap(16),
-
-            // DATOS DE LA CATEGORÍA
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Contenido sobrepuesto
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
                 children: [
-                  Text(category.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const Gap(4),
-                  Row(
-                    children: [
-                      // Badge de Frecuencia
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colors.secondaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          getFrequencyLabel(category.frequency),
-                          style: TextStyle(fontSize: 10, color: colors.onSecondaryContainer, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const Gap(8),
-                      // Conteo de items
-                      Text("${data.expenses.length} ítems", style: TextStyle(fontSize: 12, color: colors.outline)),
-                    ],
+                  // ICONO DE CATEGORÍA GRANDE
+                  Container(
+                    width: 55, height: 55,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha((255 * 0.2).round()),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      getIconFromCode(category.iconCode),
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
+                  const Gap(16),
+                  // DATOS DE LA CATEGORÍA
+                  Expanded( // Se envuelve la columna en un Padding para el ajuste solicitado
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 5.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(category.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colors.onSurface)),
+                          const Gap(4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: colors.secondaryContainer, borderRadius: BorderRadius.circular(8)),
+                                child: Text(getFrequencyLabel(category.frequency), style: TextStyle(fontSize: 10, color: colors.onSecondaryContainer, fontWeight: FontWeight.bold)),
+                              ),
+                              const Gap(8),
+                              Text("${data.expenses.length} ítems", style: TextStyle(fontSize: 12, color: colors.outline)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // TOTAL SUMADO
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text("Total", style: TextStyle(fontSize: 10, color: colors.outline)),
+                      Text("\$${data.totalAmount.toStringAsFixed(2)}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: colors.primary)),
+                      Icon(Icons.arrow_forward_ios, size: 12, color: colors.outline)
+                    ],
+                  )
                 ],
               ),
-            ),
-
-            // TOTAL SUMADO
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text("Total", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                Text(
-                  "\$${data.totalAmount.toStringAsFixed(2)}",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: colors.primary),
-                ),
-                const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey)
-              ],
             )
           ],
         ),

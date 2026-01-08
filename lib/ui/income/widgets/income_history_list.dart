@@ -78,7 +78,7 @@ class IncomeHistoryList extends ConsumerWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.green.withOpacity(0.1), // Corrección opacidad
+                    backgroundColor: Colors.green.withAlpha((255 * 0.1).round()),
                     child: Icon(
                       getIconFromCode(transaction.categoryIconCode),
                       color: Colors.green,

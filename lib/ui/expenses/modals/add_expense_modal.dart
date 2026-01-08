@@ -25,7 +25,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
   final _noteController = TextEditingController();
   
   bool _isFixedExpense = false;
-  Frequency _selectedFrequency = Frequency.monthly;
   DateTime _selectedDate = DateTime.now();
   Category? _selectedCategory;
 
@@ -37,7 +36,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       _amountController.text = e.amount.toString();
       _noteController.text = e.title;
       _isFixedExpense = e.isRecurring;
-      _selectedFrequency = e.frequency;
       _selectedDate = e.date;
       _selectedCategory = e.category.value;
     } else {
@@ -45,7 +43,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       if (widget.preSelectedCategory != null) {
         _selectedCategory = widget.preSelectedCategory;
         _isFixedExpense = true; // Asumimos que es fijo si viene de ahí
-        _selectedFrequency = _selectedCategory!.frequency ?? Frequency.monthly;
       }
     }
   }
@@ -105,7 +102,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
               hintText: "0.00",
               prefixIcon: const Icon(Icons.attach_money, color: Colors.red),
               border: InputBorder.none,
-              hintStyle: TextStyle(color: colors.outline.withOpacity(0.3)),
+              hintStyle: TextStyle(color: colors.outline.withAlpha((255 * 0.3).round())),
             ),
           ),
 
@@ -119,7 +116,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
               // Cambiamos el placeholder para que entienda que es un item
               hintText: _isFixedExpense ? "Nombre del Item (Ej: Carne, Gas...)" : "Ej: Desayuno, Uber...",
               filled: true,
-              fillColor: colors.surfaceContainerHighest.withOpacity(0.3),
+              fillColor: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
             ),
           ),
@@ -176,7 +173,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withAlpha((255 * 0.1).round()), blurRadius: 4)] : null,
         ),
         child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.grey, fontSize: 12)),
       ),
@@ -240,13 +237,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
 
                   return GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _selectedCategory = category;
-                        // Si es fijo, el gasto hereda la frecuencia de la categoría
-                        if (_isFixedExpense && category.frequency != null) {
-                          _selectedFrequency = category.frequency!;
-                        }
-                      });
+                      setState(() => _selectedCategory = category);
                     },
                     child: Column(
                       children: [
@@ -330,9 +321,10 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       ),
     );
 
-    if (confirm == true && widget.expenseToEdit != null) {
+    // Se comprueba que el widget sigue montado ANTES y DESPUÉS de la operación asíncrona.
+    if (confirm == true && widget.expenseToEdit != null && mounted) {
       await ref.read(expenseDaoProvider).deleteExpense(widget.expenseToEdit!.id);
-      if (context.mounted) {
+      if (mounted) {
         Navigator.pop(context); 
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item eliminado")));
       }

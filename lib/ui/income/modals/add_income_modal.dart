@@ -73,7 +73,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
                     Switch(
                       value: _isRecurring,
                       onChanged: (value) => setState(() => _isRecurring = value),
-                      activeColor: colors.primary,
+                      activeTrackColor: colors.primary,
                     ),
                     Text("Fijo", style: TextStyle(
                       fontWeight: _isRecurring ? FontWeight.bold : FontWeight.normal,
@@ -175,7 +175,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..type = TransactionType.income
           ..categoryName = "Extra"
           ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
-          ..colorValue = Colors.green.value;
+          ..colorValue = 0xFF4CAF50; // Equivalente a Colors.green.value
 
         await transactionDao.addTransaction(newTransaction);
       }
@@ -224,7 +224,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
             decoration: BoxDecoration(
-              border: Border.all(color: colors.outline.withOpacity(0.5)),
+              border: Border.all(color: colors.outline.withAlpha((255 * 0.5).round())),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -233,7 +233,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
                 const Gap(10),
                 Expanded(
                   child: Text(
-                    IsDateToday(_selectedDate) 
+                    isDateToday(_selectedDate) 
                         ? "Hoy (${DateFormat('dd/MM').format(_selectedDate)})"
                         : DateFormat('EEEE d, MMM yyyy', 'es').format(_selectedDate),
                     style: const TextStyle(fontSize: 16),
@@ -281,7 +281,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: colors.secondaryContainer.withOpacity(0.3),
+            color: colors.secondaryContainer.withAlpha((255 * 0.3).round()),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: colors.outlineVariant),
           ),
@@ -402,7 +402,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     );
   }
 
-  bool IsDateToday(DateTime date) {
+  bool isDateToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year && date.month == now.month && date.day == now.day;
   }

@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:isar/isar.dart';
-
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-
 import 'config/theme/app_theme.dart';
 import 'ui/home/home_screen.dart';
-// ✅ IMPORTAMOS LAS PANTALLAS Y MODALES NECESARIOS PARA LA NAVEGACIÓN
 import 'ui/expenses/expenses_screen.dart';
 import 'ui/income/income_screen.dart';
 import 'logic/providers/time_provider.dart';
 import 'data/local_db/isar_db.dart';
 import 'logic/services/category_seeder.dart';
-import 'logic/services/notification_service.dart'; 
+import 'logic/services/notification_service.dart';
 import 'ui/income/modals/recurring_detail_modal.dart';
 import 'data/models/recurring_movement.dart'; 
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -38,31 +33,6 @@ Future<void> main() async {
   final allIncomes = await isar.recurringMovements.where().findAll();
   await NotificationService().scheduleAllNotifications(allIncomes);
 
-  // 🕵️‍♂️ --- INICIO DEL DIAGNÓSTICO --- 🕵️‍♂️
-  print("\n🔵 ================= DIAGNÓSTICO DE NOTIFICACIONES =================");
-  
-  // A. Ver la hora exacta y zona horaria que detecta la app
-  final now = tz.TZDateTime.now(tz.local);
-  print("⌚ Hora actual del sistema (Timezone): $now");
-  print("🌍 Zona Horaria detectada: ${tz.local.name}");
-
-  // B. Consultar al sistema Android cuántas alarmas hay realmente
-  final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  final List<PendingNotificationRequest> pending = 
-      await flutterLocalNotificationsPlugin.pendingNotificationRequests();
-  
-  if (pending.isEmpty) {
-    print("❌ ALERTA: La lista de notificaciones pendientes está VACÍA.");
-    print("   Posible causa: La lógica de fechas falló o Android bloqueó la programación.");
-  } else {
-    print("✅ ESTADO OK: Hay ${pending.length} notificaciones en cola:");
-    for (var p in pending) {
-      print("   ➡ ID: ${p.id} | Título: ${p.title} | Payload: ${p.payload}");
-    }
-  }
-  print("🔵 ================= FIN DEL DIAGNÓSTICO ==========================\n");
-  // -----------------------------------------------------------------------
-
   runApp(const ProviderScope(child: MainApp()));
 }
 
@@ -79,12 +49,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   // Pantalla de Ahorro (Placeholder)
+  // ✅ Se cambia a 'final' porque AppBar no es un constructor 'const'.
   static final Widget _savingsScreen = Scaffold(
     appBar: AppBar(title: const Text("Ahorro")),
     body: const Center(child: Icon(FontAwesomeIcons.piggyBank, size: 60, color: Colors.pinkAccent)),
   );
 
   // Lista de las 4 pantallas principales
+  // ✅ Se cambia a 'final' porque contiene '_savingsScreen' que ya no es 'const'.
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(),     // La nueva pantalla de inicio
     const ExpensesScreen(), // Tu pantalla de gastos existente
@@ -147,21 +119,26 @@ class _MainAppState extends ConsumerState<MainApp> {
   }
 
   Future<void> _handleNotificationOpen(String payload) async {
+    // Se captura el contexto ANTES de cualquier 'await' para evitar advertencias del linter.
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
     try {
       final parts = payload.split('|');
       final incomeId = int.parse(parts[0]);
       final isar = await IsarService().db;
       final income = await isar.recurringMovements.get(incomeId);
 
-      if (income != null && navigatorKey.currentContext != null) {
+      // Se comprueba si el widget sigue "montado" DESPUÉS del 'await'.
+      if (income != null && context.mounted) {
         showModalBottomSheet(
-          context: navigatorKey.currentContext!,
+          context: context,
           isScrollControlled: true,
           builder: (ctx) => RecurringDetailModal(movement: income),
         );
       }
     } catch (e) {
-      print("Error abriendo notificación: $e");
+      debugPrint("Error abriendo notificación: $e");
     }
   }
 

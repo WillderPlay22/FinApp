@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import '../../../data/models/expense.dart';
-import '../../../data/models/category.dart'; // ✅ IMPORTACIÓN AÑADIDA
-import '../../../logic/models/category_with_expenses.dart'; 
+import '../../../data/models/category.dart';
 import '../../../logic/providers/database_providers.dart';
 import '../../../data/daos/expense_dao.dart';
 import '../../../date_utils.dart';
@@ -65,6 +64,7 @@ class FixedCategoryDetailModal extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
+                  // ignore: deprecated_member_use
                   color: Color(category.colorValue).withOpacity(0.15),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                 ),
@@ -118,11 +118,15 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                           ),
                         );
 
+                        // Se comprueba que el widget sigue montado ANTES de la operación asíncrona.
                         if (confirm == true && context.mounted) {
                           // El modal se cerrará automáticamente porque el stream de `category` emitirá null.
                           await ref.read(expenseDaoProvider).deleteCategoryAndRelatedData(categoryId);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Categoría eliminada con éxito.")));
+                          // Se vuelve a comprobar DESPUÉS del await para mostrar el SnackBar de forma segura.
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Categoría eliminada con éxito.")));
+                          }
                         }
                       },
                     ),
@@ -211,9 +215,10 @@ class _ExpenseChildItem extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest.withOpacity(0.3),
+              // ignore: deprecated_member_use
+              color: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
               borderRadius: BorderRadius.circular(12),
-              border: isPaid ? Border.all(color: Colors.green, width: 1.5) : null,
+              border: isPaid ? Border.all(color: Colors.red.shade300, width: 1.5) : null,
             ),
             child: Row(
               children: [
@@ -221,8 +226,8 @@ class _ExpenseChildItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(expense.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, decoration: isPaid ? TextDecoration.lineThrough : null, color: isPaid ? Colors.grey : colors.onSurface)),
-                      Text("\$${expense.amount.toStringAsFixed(2)}", style: TextStyle(color: isPaid ? Colors.green : colors.primary, fontWeight: FontWeight.bold)),
+                      Text(expense.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, decoration: isPaid ? TextDecoration.lineThrough : null, color: isPaid ? Colors.grey : null)),
+                      Text("\$${expense.amount.toStringAsFixed(2)}", style: TextStyle(color: isPaid ? Colors.red.shade300 : colors.primary, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -233,7 +238,7 @@ class _ExpenseChildItem extends StatelessWidget {
                     onPressed: () => _confirmPayment(context, expenseDao, expense),
                   )
                 else
-                  const Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  Icon(Icons.check_circle, color: Colors.red.shade300, size: 28),
               ],
             ),
           ),
@@ -245,15 +250,17 @@ class _ExpenseChildItem extends StatelessWidget {
   void _confirmPayment(BuildContext context, ExpenseDao dao, Expense expense) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text("Pagar ${expense.title}"),
         content: Text("¿Confirmar pago de \$${expense.amount}?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancelar")),
           ElevatedButton(
-            onPressed: () {
-              dao.markFixedExpenseAsPaid(expense);
-              Navigator.pop(ctx);
+            onPressed: () async {
+              await dao.markFixedExpenseAsPaid(expense);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
             },
             child: const Text("Confirmar"),
           )

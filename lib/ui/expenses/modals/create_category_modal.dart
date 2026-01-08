@@ -91,7 +91,7 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
               prefixIcon: Icon(getIconFromCode(_selectedIconCode), color: _selectedColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
               filled: true,
-              fillColor: colors.surfaceContainerHighest.withOpacity(0.3),
+              fillColor: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
             ),
           ),
             const Gap(20),
@@ -103,6 +103,7 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
               const Gap(10),
               Expanded(
                 child: DropdownButtonFormField<Frequency>(
+                  // ignore: deprecated_member_use
                   value: _selectedFrequency,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
@@ -173,7 +174,7 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
                   onTap: () => setState(() => _selectedIconCode = icon.codePoint),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? _selectedColor.withOpacity(0.2) : colors.surfaceContainerHighest,
+                      color: isSelected ? _selectedColor.withAlpha((255 * 0.2).round()) : colors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                       border: isSelected ? Border.all(color: _selectedColor, width: 2) : null,
                     ),
@@ -214,6 +215,7 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
     final category = Category(
       name: _nameController.text,
       iconCode: _selectedIconCode,
+      // ignore: deprecated_member_use
       colorValue: _selectedColor.value,
       frequency: _selectedFrequency,
       isExpense: true,

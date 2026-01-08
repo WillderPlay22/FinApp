@@ -117,18 +117,22 @@ class ExpensesScreen extends ConsumerStatefulWidget {
 
 class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  // Se guarda la función del listener para poder removerla correctamente en el dispose.
+  late final VoidCallback _tabListener;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Añadimos un listener para reconstruir el estado y que el gráfico se actualice al cambiar de pestaña
-    _tabController.addListener(() => setState(() {}));
+    // Se define y añade el listener.
+    _tabListener = () => setState(() {});
+    _tabController.addListener(_tabListener);
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(() {});
+    // Se remueve el listener específico que se añadió.
+    _tabController.removeListener(_tabListener);
     _tabController.dispose();
     super.dispose();
   }

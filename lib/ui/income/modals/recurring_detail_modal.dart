@@ -58,8 +58,8 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
                 const SizedBox(width: 48), 
                 Container(
                   padding: const EdgeInsets.all(16), // Reemplazo de withOpacity
-                  decoration: BoxDecoration(color: Colors.indigo.withAlpha((255 * 0.1).round()), shape: BoxShape.circle),
-                  child: const Icon(FontAwesomeIcons.fileContract, size: 32, color: Colors.indigo),
+                  decoration: BoxDecoration(color: Colors.teal.withAlpha((255 * 0.1).round()), shape: BoxShape.circle),
+                  child: const Icon(FontAwesomeIcons.fileContract, size: 32, color: Colors.teal),
                 ),
                 IconButton(
                   onPressed: () => _showEditDialog(context), 
@@ -85,11 +85,11 @@ class _RecurringDetailModalState extends ConsumerState<RecurringDetailModal> {
 
             Row(
               children: [
-                Icon(FontAwesomeIcons.calendarCheck, size: 16, color: colors.primary),
+                const Icon(FontAwesomeIcons.calendarCheck, size: 16, color: Colors.teal),
                 const Gap(8),
                 Text(
                   "Ciclo: ${DateFormat('MMMM yyyy', 'es').format(currentDate).toUpperCase()}",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary, letterSpacing: 1),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, letterSpacing: 1),
                 ),
               ],
             ),
@@ -452,7 +452,7 @@ class _PaymentButtonState extends State<_PaymentButton> {
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), backgroundColor: colors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 2),
+            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.teal, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 2),
             icon: const Icon(FontAwesomeIcons.handHoldingDollar, size: 18),
             label: Text("Cobrar \$${widget.amountToPay.toStringAsFixed(0)}"), 
             onPressed: () => _showConfirmDialog(context),
@@ -495,7 +495,7 @@ class _PaymentButtonState extends State<_PaymentButton> {
                     ..date = DateTime.now() 
                     ..type = TransactionType.income
                     ..categoryName = widget.parentIncome.title
-                    ..categoryIconCode = FontAwesomeIcons.sackDollar.codePoint
+                    ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
                     ..colorValue = 0xFF4CAF50 // Equivalente a Colors.green.value, para evitar el lint de deprecación.
                     ..parentRecurringId = widget.parentIncome.id;
 

@@ -1,4 +1,5 @@
 import 'package:isar/isar.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../local_db/isar_db.dart';
 import '../models/recurring_movement.dart';
 import '../models/transaction.dart';
@@ -141,7 +142,7 @@ class RecurringDao {
       ..date = now 
       ..type = TransactionType.income
       ..categoryName = "Ingreso Fijo"
-      ..categoryIconCode = 0xf0d6
+      ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
       ..colorValue = 0xFF4CAF50
       ..parentRecurringId = movement.id; 
 

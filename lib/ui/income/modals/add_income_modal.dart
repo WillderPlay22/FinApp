@@ -68,16 +68,16 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
                   children: [
                     Text("Extra", style: TextStyle(
                       fontWeight: !_isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: !_isRecurring ? colors.primary : colors.outline
+                      color: !_isRecurring ? Colors.teal : colors.outline
                     )),
                     Switch(
                       value: _isRecurring,
                       onChanged: (value) => setState(() => _isRecurring = value),
-                      activeTrackColor: colors.primary,
+                      activeTrackColor: Colors.teal,
                     ),
                     Text("Fijo", style: TextStyle(
                       fontWeight: _isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: _isRecurring ? colors.primary : colors.outline
+                      color: _isRecurring ? Colors.teal : colors.outline
                     )),
                   ],
                 ),
@@ -97,8 +97,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             ElevatedButton(
               onPressed: _saveData,
               style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -229,7 +229,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             ),
             child: Row(
               children: [
-                Icon(FontAwesomeIcons.calendarDay, color: colors.primary),
+                const Icon(FontAwesomeIcons.calendarDay, color: Colors.teal),
                 const Gap(10),
                 Expanded(
                   child: Text(
@@ -354,8 +354,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
               onTap: () => setState(() => _selectedDayOfWeek = index + 1),
               child: CircleAvatar(
                 radius: 18,
-                backgroundColor: isSelected ? colors.primary : colors.surfaceContainerHighest,
-                foregroundColor: isSelected ? colors.onPrimary : colors.onSurface,
+                backgroundColor: isSelected ? Colors.teal : colors.surfaceContainerHighest,
+                foregroundColor: isSelected ? Colors.white : colors.onSurface,
                 child: Text(days[index], style: const TextStyle(fontSize: 12)),
               ),
             );

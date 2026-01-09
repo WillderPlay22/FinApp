@@ -1,120 +1,217 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:gap/gap.dart';
-import '../../../logic/providers/database_providers.dart';
+import 'package:intl/intl.dart';
 
-class IncomeSummaryHeader extends ConsumerWidget {
-  const IncomeSummaryHeader({super.key});
+class IncomeSummaryHeader extends ConsumerStatefulWidget {
+  final int tabIndex;
+  final AsyncValue<Map<String, ({double total, int color})>> chartData;
+  final AsyncValue<double> projectedTotal;
+  final AsyncValue<double> executedTotal;
+  final AsyncValue<double> historyTotal;
+
+  const IncomeSummaryHeader({
+    super.key,
+    required this.tabIndex,
+    required this.chartData,
+    required this.projectedTotal,
+    required this.executedTotal,
+    required this.historyTotal,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Necesitamos ambos DAOs ahora
-    final transactionDao = ref.watch(transactionDaoProvider);
-    final recurringDao = ref.watch(recurringDaoProvider); // <--- NUEVO
+  ConsumerState<IncomeSummaryHeader> createState() => _IncomeSummaryHeaderState();
+}
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // TARJETA 1: PERCIBIDO (REAL)
-          Expanded(
-            child: StreamBuilder<double>(
-              stream: transactionDao.watchTotalIncomeThisMonth(),
-              builder: (context, snapshot) {
-                final total = snapshot.data ?? 0.0;
-                return _SummaryCard(
-                  title: "Percibido",
-                  amount: total,
-                  icon: FontAwesomeIcons.check,
-                  color: Colors.green,
-                  isFilled: true,
-                );
-              },
-            ),
-          ),
-          
-          const Gap(12),
+class _IncomeSummaryHeaderState extends ConsumerState<IncomeSummaryHeader> {
+  int? touchedIndex;
 
-          // TARJETA 2: PROYECTADO (ESTIMADO MENSUAL)
-          Expanded(
-            child: StreamBuilder<double>(
-              stream: recurringDao.watchProjectedMonthlyIncome(), // <--- CONECTADO AQUÍ
-              builder: (context, snapshot) {
-                final projected = snapshot.data ?? 0.0;
-                return _SummaryCard(
-                  title: "Proyectado",
-                  amount: projected, // <--- DATO REAL
-                  icon: FontAwesomeIcons.hourglassHalf,
-                  color: Colors.blue,
-                  isFilled: false,
-                );
-              },
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      child: SizedBox(
+        height: 190,
+        child: Row(
+          children: [
+            // --- GRÁFICO DE DONA ---
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: widget.chartData.when(
+                data: (data) => _buildChart(context, data),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) => const Center(child: Icon(Icons.error_outline)),
+              ),
             ),
-          ),
-        ],
+            const Gap(16),
+            // --- TARJETAS DE TOTALES ---
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.0, 0.3),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildCardsForTab(widget.tabIndex),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildCardsForTab(int index) {
+    switch (index) {
+      case 0: // Pestaña "Mis Fijos"
+        return Column(
+          key: const ValueKey('income_cards'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SummaryCard(
+              title: "Cobrado",
+              amountAsync: widget.executedTotal,
+              color: Colors.teal.shade700,
+            ),
+            const Gap(12),
+            _SummaryCard(
+              title: "Proyectado",
+              amountAsync: widget.projectedTotal,
+              color: Colors.blueGrey.shade600,
+            ),
+          ],
+        );
+      case 1: // Pestaña "Historial"
+      default:
+        return Center(
+          key: const ValueKey('history_card'),
+          child: _SummaryCard(
+            title: "Total Recibido",
+            amountAsync: widget.historyTotal,
+            color: Colors.green.shade700,
+            isEnlarged: true,
+          ),
+        );
+    }
+  }
+
+  Widget _buildChart(BuildContext context, Map<String, ({double total, int color})> data) {
+    final List<PieChartSectionData> sections = [];
+    
+    int i = 0;
+    for (var entry in data.entries) {
+      if (entry.value.total <= 0) continue;
+
+      final isTouched = i == touchedIndex;
+      final radius = isTouched ? 35.0 : 25.0;
+      final value = entry.value;
+
+      sections.add(PieChartSectionData(
+        value: value.total,
+        color: Color(value.color),
+        title: '',
+        radius: radius,
+      ));
+      i++;
+    }
+
+    if (sections.isEmpty) {
+      return PieChart(
+        PieChartData(
+          sections: [PieChartSectionData(value: 1, color: Theme.of(context).colorScheme.surfaceContainerHighest, title: '', radius: 25)],
+          centerSpaceRadius: 45,
+          sectionsSpace: 2,
+        ),
+        swapAnimationDuration: const Duration(milliseconds: 800),
+        swapAnimationCurve: Curves.easeInOutCubic,
+      );
+    }
+
+    return PieChart(
+      PieChartData(
+        pieTouchData: PieTouchData(
+          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+            setState(() {
+              if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                touchedIndex = -1;
+                return;
+              }
+              touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+            });
+          },
+        ),
+        sections: sections,
+        centerSpaceRadius: 45,
+        sectionsSpace: 2,
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 800),
+      swapAnimationCurve: Curves.easeInOutCubic,
     );
   }
 }
 
-// ... (La clase _SummaryCard sigue igual abajo)
 class _SummaryCard extends StatelessWidget {
   final String title;
-  final double amount;
-  final IconData icon;
-  final MaterialColor color;
-  final bool isFilled;
+  final AsyncValue<double> amountAsync;
+  final Color color;
+  final bool isEnlarged;
 
-  const _SummaryCard({
-    required this.title,
-    required this.amount,
-    required this.icon,
-    required this.color,
-    required this.isFilled,
-  });
+  const _SummaryCard({required this.title, required this.amountAsync, required this.color, this.isEnlarged = false});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bgColor = isFilled ? color.shade600 : theme.cardColor;
-    final textColor = isFilled ? Colors.white : theme.colorScheme.onSurface;
-    final subTextColor = isFilled ? Colors.white70 : theme.colorScheme.outline;
+    final textTheme = Theme.of(context).textTheme;
+    final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 2);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 80),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: isFilled ? null : Border.all(color: theme.colorScheme.outlineVariant),
-        boxShadow: isFilled 
-            ? [BoxShadow(color: color.withAlpha((255 * 0.4).round()), blurRadius: 8, offset: const Offset(0, 4))]
-            : null,
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha((255 * 0.3).round()),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: isFilled ? Colors.white : color),
-              const Gap(8),
-              Text(title, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const Gap(10),
           Text(
-            "\$ ${amount.toStringAsFixed(2)}",
-            style: TextStyle(
-              fontSize: 22, 
-              fontWeight: FontWeight.w900, 
-              color: textColor
+            title,
+            style: textTheme.labelMedium?.copyWith(
+              color: Colors.white.withAlpha((255 * 0.8).round()),
+              fontWeight: FontWeight.bold,
+              fontSize: isEnlarged ? 14 : 12,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          const Gap(4),
-          Text(
-            "Mensual Est.",
-            style: TextStyle(fontSize: 10, color: subTextColor),
-          )
+          Gap(isEnlarged ? 8 : 4),
+          amountAsync.when(
+            data: (amount) => Text(
+              currencyFormat.format(amount),
+              style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+            ),
+            loading: () => SizedBox(height: isEnlarged ? 32 : 24, child: Center(child: SizedBox(width: isEnlarged ? 32 : 24, height: isEnlarged ? 32 : 24, child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)))),
+            error: (e, s) => const Text("Error", style: TextStyle(color: Colors.white70)),
+          ),
         ],
       ),
     );

@@ -63,18 +63,23 @@ const DebtSchema = CollectionSchema(
       name: r'nextPaymentDate',
       type: IsarType.dateTime,
     ),
-    r'remainingAmount': PropertySchema(
+    r'originalInstallmentAmount': PropertySchema(
       id: 9,
+      name: r'originalInstallmentAmount',
+      type: IsarType.double,
+    ),
+    r'remainingAmount': PropertySchema(
+      id: 10,
       name: r'remainingAmount',
       type: IsarType.double,
     ),
     r'title': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'title',
       type: IsarType.string,
     ),
     r'totalAmount': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'totalAmount',
       type: IsarType.double,
     )
@@ -118,9 +123,10 @@ void _debtSerialize(
   writer.writeLong(offsets[6], object.installmentCount);
   writer.writeBool(offsets[7], object.isPaidOff);
   writer.writeDateTime(offsets[8], object.nextPaymentDate);
-  writer.writeDouble(offsets[9], object.remainingAmount);
-  writer.writeString(offsets[10], object.title);
-  writer.writeDouble(offsets[11], object.totalAmount);
+  writer.writeDouble(offsets[9], object.originalInstallmentAmount);
+  writer.writeDouble(offsets[10], object.remainingAmount);
+  writer.writeString(offsets[11], object.title);
+  writer.writeDouble(offsets[12], object.totalAmount);
 }
 
 Debt _debtDeserialize(
@@ -142,9 +148,10 @@ Debt _debtDeserialize(
   object.installmentCount = reader.readLong(offsets[6]);
   object.isPaidOff = reader.readBool(offsets[7]);
   object.nextPaymentDate = reader.readDateTimeOrNull(offsets[8]);
-  object.remainingAmount = reader.readDouble(offsets[9]);
-  object.title = reader.readString(offsets[10]);
-  object.totalAmount = reader.readDouble(offsets[11]);
+  object.originalInstallmentAmount = reader.readDoubleOrNull(offsets[9]);
+  object.remainingAmount = reader.readDouble(offsets[10]);
+  object.title = reader.readString(offsets[11]);
+  object.totalAmount = reader.readDouble(offsets[12]);
   return object;
 }
 
@@ -175,10 +182,12 @@ P _debtDeserializeProp<P>(
     case 8:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 9:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 10:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -841,6 +850,90 @@ extension DebtQueryFilter on QueryBuilder<Debt, Debt, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'originalInstallmentAmount',
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'originalInstallmentAmount',
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'originalInstallmentAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'originalInstallmentAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'originalInstallmentAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition>
+      originalInstallmentAmountBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'originalInstallmentAmount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
   QueryBuilder<Debt, Debt, QAfterFilterCondition> remainingAmountEqualTo(
     double value, {
     double epsilon = Query.epsilon,
@@ -1207,6 +1300,18 @@ extension DebtQuerySortBy on QueryBuilder<Debt, Debt, QSortBy> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QAfterSortBy> sortByOriginalInstallmentAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'originalInstallmentAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterSortBy> sortByOriginalInstallmentAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'originalInstallmentAmount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Debt, Debt, QAfterSortBy> sortByRemainingAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remainingAmount', Sort.asc);
@@ -1365,6 +1470,18 @@ extension DebtQuerySortThenBy on QueryBuilder<Debt, Debt, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QAfterSortBy> thenByOriginalInstallmentAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'originalInstallmentAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterSortBy> thenByOriginalInstallmentAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'originalInstallmentAmount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Debt, Debt, QAfterSortBy> thenByRemainingAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remainingAmount', Sort.asc);
@@ -1457,6 +1574,12 @@ extension DebtQueryWhereDistinct on QueryBuilder<Debt, Debt, QDistinct> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QDistinct> distinctByOriginalInstallmentAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'originalInstallmentAmount');
+    });
+  }
+
   QueryBuilder<Debt, Debt, QDistinct> distinctByRemainingAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'remainingAmount');
@@ -1535,6 +1658,13 @@ extension DebtQueryProperty on QueryBuilder<Debt, Debt, QQueryProperty> {
   QueryBuilder<Debt, DateTime?, QQueryOperations> nextPaymentDateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'nextPaymentDate');
+    });
+  }
+
+  QueryBuilder<Debt, double?, QQueryOperations>
+      originalInstallmentAmountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'originalInstallmentAmount');
     });
   }
 

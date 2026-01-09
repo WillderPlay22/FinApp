@@ -173,6 +173,12 @@ class _ExpenseHistoryItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
+    // Determinar el ícono y color correctos.
+    // Para deudas, usamos valores fijos. Para otros, usamos los de la transacción.
+    final bool isDebtPayment = transaction.categoryName == "Deudas";
+    final IconData icon = isDebtPayment ? FontAwesomeIcons.fileInvoiceDollar : getIconFromCode(transaction.categoryIconCode);
+    final Color iconColor = isDebtPayment ? Colors.purple.shade700 : Color(transaction.colorValue);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -185,12 +191,12 @@ class _ExpenseHistoryItem extends StatelessWidget {
           Container(
             width: 45, height: 45,
             decoration: BoxDecoration(
-              color: Color(transaction.colorValue).withAlpha((255 * 0.2).round()),
+              color: iconColor.withAlpha((255 * 0.2).round()),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              getIconFromCode(transaction.categoryIconCode),
-              color: Color(transaction.colorValue),
+              icon,
+              color: iconColor,
               size: 20,
             ),
           ),

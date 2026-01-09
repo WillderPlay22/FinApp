@@ -31,10 +31,10 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16.0),
-      // ✅ Se envuelve el contenido en un SizedBox con altura fija para evitar el "salto" de la UI.
-      // La altura de 160px se elige para acomodar la configuración más alta (las dos tarjetas).
+      // ✅ AUMENTADO: De 160 a 190 para evitar el overflow con títulos largos.
+      // Esto soluciona el error "RenderFlex overflowed" y hace que el círculo vuelva a aparecer.
       child: SizedBox(
-        height: 160,
+        height: 190,
         child: Row(
           children: [
             // --- GRÁFICO DE DONA ---
@@ -104,14 +104,14 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _SummaryCard(
-              title: "Total de gastos pagados",
-              amountAsync: widget.executedTotal, // Placeholder
+              title: "MONTO TOTAL PAGADO",
+              amountAsync: widget.executedTotal,
               color: Colors.teal.shade700,
             ),
             const Gap(12),
             _SummaryCard(
-              title: "Total de gastos pendientes",
-              amountAsync: widget.projectedTotal, // Placeholder
+              title: "MONTO TOTAL DE DEUDAS PENDIENTES",
+              amountAsync: widget.projectedTotal,
               color: Colors.purple.shade700,
             ),
           ],
@@ -136,6 +136,10 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
     
     int i = 0;
     for (var entry in data.entries) {
+      // ✅ CORRECCIÓN: Solo añadimos secciones si el valor es mayor a 0.
+      // Si ambos son 0, la lista 'sections' quedará vacía y se mostrará el gráfico "vacío" (gris).
+      if (entry.value.total <= 0) continue;
+
       final isTouched = i == touchedIndex;
       final radius = isTouched ? 35.0 : 25.0;
       final value = entry.value;
@@ -204,7 +208,7 @@ class _SummaryCard extends StatelessWidget {
 
     return Container(
       width: double.infinity, // Asegura que ocupe todo el ancho disponible
-      constraints: const BoxConstraints(minHeight: 74), // Altura mínima para consistencia
+      constraints: const BoxConstraints(minHeight: 80), // Aumentado ligeramente
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color,
@@ -229,6 +233,9 @@ class _SummaryCard extends StatelessWidget {
               // Se agranda el título si la tarjeta es la principal
               fontSize: isEnlarged ? 14 : 12,
             ),
+            textAlign: TextAlign.center, // Centrar texto para títulos largos
+            maxLines: 2, // Permitir 2 líneas
+            overflow: TextOverflow.ellipsis,
           ),
           Gap(isEnlarged ? 8 : 4), // Más espacio en la tarjeta grande
           amountAsync.when(

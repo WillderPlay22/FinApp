@@ -213,6 +213,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
       ..remainingAmount = remainingAmount
       ..installmentCount = installmentCount
       ..installmentAmount = installmentAmount
+      ..originalInstallmentAmount = installmentAmount // Set the baseline
       ..frequency = _frequency
       ..customDays = customDays
       ..creationDate = now

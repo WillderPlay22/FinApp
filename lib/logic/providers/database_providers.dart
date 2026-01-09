@@ -7,6 +7,7 @@ import '../../data/daos/expense_dao.dart';
 import '../../data/daos/category_dao.dart';
 import '../../data/daos/debt_dao.dart';
 import '../../data/models/debt.dart';
+import '../../data/models/transaction.dart';
 
 // 1. Proveedor de la conexión a Base de Datos
 final isarServiceProvider = Provider<IsarService>((ref) {
@@ -55,4 +56,10 @@ final debtDaoProvider = Provider<DebtDao>((ref) {
 final allDebtsProvider = StreamProvider<List<Debt>>((ref) {
   final dao = ref.watch(debtDaoProvider);
   return dao.watchAllDebts();
+});
+
+// 9. Proveedor del Stream de Transacciones para una Deuda (NUEVO)
+final debtTransactionsProvider = StreamProvider.family<List<FinancialTransaction>, int>((ref, debtId) {
+  final dao = ref.watch(debtDaoProvider);
+  return dao.watchTransactionsForDebt(debtId);
 });

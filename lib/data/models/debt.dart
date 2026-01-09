@@ -13,6 +13,7 @@ class Debt {
   late double remainingAmount;
   late int installmentCount;
   late double installmentAmount;
+  double? originalInstallmentAmount; // The baseline installment amount
   @enumerated
   late DebtFrequency frequency; // Stored as int
   int? customDays; // For custom frequency

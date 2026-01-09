@@ -108,6 +108,33 @@ final executedTotalProvider = StreamProvider<double>((ref) {
   return ref.watch(expenseDaoProvider).watchTotalExecutedThisMonth();
 });
 
+// --- PROVIDERS PARA EL RESUMEN DE DEUDAS ---
+
+final debtPaidTotalProvider = StreamProvider<double>((ref) {
+  final now = ref.watch(nowProvider);
+  return ref.watch(debtDaoProvider).watchDebtPaidThisMonth(now);
+});
+
+final debtPendingTotalProvider = StreamProvider<double>((ref) {
+  final now = ref.watch(nowProvider);
+  return ref.watch(debtDaoProvider).watchDebtPendingThisMonth(now);
+});
+
+final debtChartDataProvider = Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
+  final paidAsync = ref.watch(debtPaidTotalProvider);
+  final pendingAsync = ref.watch(debtPendingTotalProvider);
+
+  if (paidAsync.isLoading || pendingAsync.isLoading) return const AsyncValue.loading();
+
+  final paid = paidAsync.value ?? 0.0;
+  final pending = pendingAsync.value ?? 0.0;
+
+  return AsyncValue.data({
+    "Pagado": (total: paid, color: Colors.teal.shade700.value),
+    "Pendiente": (total: pending, color: Colors.purple.shade700.value),
+  });
+});
+
 // --- WIDGET DE LA PANTALLA ---
 
 class ExpensesScreen extends ConsumerStatefulWidget {
@@ -147,14 +174,17 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
     final AsyncValue<Map<String, ({double total, int color})>> chartData;
     if (tabIndex == 0) {
       chartData = ref.watch(categoryChartDataProvider);
+    } else if (tabIndex == 1) {
+      chartData = ref.watch(debtChartDataProvider); // Datos para Deudas
     } else if (tabIndex == 2) {
       chartData = ref.watch(historyChartDataProvider);
     } else {
-      chartData = const AsyncValue.data({}); // Placeholder para Deudas
+      chartData = const AsyncValue.data({});
     }
 
-    final projectedTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(projectedTotalProvider);
-    final executedTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(executedTotalProvider);
+    // Selección de totales según la pestaña
+    final projectedTotalAsync = (tabIndex == 1) ? ref.watch(debtPendingTotalProvider) : ref.watch(projectedTotalProvider);
+    final executedTotalAsync = (tabIndex == 1) ? ref.watch(debtPaidTotalProvider) : ref.watch(executedTotalProvider);
     final historyTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(historyTotalProvider);
 
     return Scaffold(

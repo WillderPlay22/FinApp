@@ -104,6 +104,12 @@ const FinancialTransactionSchema = CollectionSchema(
       name: r'relatedExpense',
       target: r'Expense',
       single: true,
+    ),
+    r'relatedDebt': LinkSchema(
+      id: 8523989151007108499,
+      name: r'relatedDebt',
+      target: r'Debt',
+      single: true,
     )
   },
   embeddedSchemas: {},
@@ -211,7 +217,7 @@ Id _financialTransactionGetId(FinancialTransaction object) {
 
 List<IsarLinkBase<dynamic>> _financialTransactionGetLinks(
     FinancialTransaction object) {
-  return [object.relatedExpense];
+  return [object.relatedExpense, object.relatedDebt];
 }
 
 void _financialTransactionAttach(
@@ -219,6 +225,8 @@ void _financialTransactionAttach(
   object.id = id;
   object.relatedExpense
       .attach(col, col.isar.collection<Expense>(), r'relatedExpense', id);
+  object.relatedDebt
+      .attach(col, col.isar.collection<Debt>(), r'relatedDebt', id);
 }
 
 extension FinancialTransactionQueryWhereSort
@@ -1335,6 +1343,20 @@ extension FinancialTransactionQueryLinks on QueryBuilder<FinancialTransaction,
       QAfterFilterCondition> relatedExpenseIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.linkLength(r'relatedExpense', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedDebt(FilterQuery<Debt> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'relatedDebt');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedDebtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'relatedDebt', 0, true, 0, true);
     });
   }
 }

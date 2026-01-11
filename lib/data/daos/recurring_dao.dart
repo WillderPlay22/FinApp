@@ -52,7 +52,7 @@ class RecurringDao {
           for (var movement in movements) {
             
             // Sumamos los montos configurados en la lista (ej: [100, 150] = 250)
-            double cycleSum = movement.paymentAmounts?.fold(0.0, (sum, val) => sum! + val) ?? 0.0;
+            double cycleSum = (movement.paymentAmounts ?? []).fold(0.0, (sum, val) => sum + val);
 
             switch (movement.frequency) {
               case Frequency.daily: 

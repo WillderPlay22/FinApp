@@ -110,6 +110,12 @@ const FinancialTransactionSchema = CollectionSchema(
       name: r'relatedDebt',
       target: r'Debt',
       single: true,
+    ),
+    r'relatedSaving': LinkSchema(
+      id: -3642736202653662871,
+      name: r'relatedSaving',
+      target: r'Saving',
+      single: true,
     )
   },
   embeddedSchemas: {},
@@ -205,10 +211,12 @@ P _financialTransactionDeserializeProp<P>(
 const _FinancialTransactiontypeEnumValueMap = {
   r'income': r'income',
   r'expense': r'expense',
+  r'saving': r'saving',
 };
 const _FinancialTransactiontypeValueEnumMap = {
   r'income': TransactionType.income,
   r'expense': TransactionType.expense,
+  r'saving': TransactionType.saving,
 };
 
 Id _financialTransactionGetId(FinancialTransaction object) {
@@ -217,7 +225,7 @@ Id _financialTransactionGetId(FinancialTransaction object) {
 
 List<IsarLinkBase<dynamic>> _financialTransactionGetLinks(
     FinancialTransaction object) {
-  return [object.relatedExpense, object.relatedDebt];
+  return [object.relatedExpense, object.relatedDebt, object.relatedSaving];
 }
 
 void _financialTransactionAttach(
@@ -227,6 +235,8 @@ void _financialTransactionAttach(
       .attach(col, col.isar.collection<Expense>(), r'relatedExpense', id);
   object.relatedDebt
       .attach(col, col.isar.collection<Debt>(), r'relatedDebt', id);
+  object.relatedSaving
+      .attach(col, col.isar.collection<Saving>(), r'relatedSaving', id);
 }
 
 extension FinancialTransactionQueryWhereSort
@@ -1357,6 +1367,20 @@ extension FinancialTransactionQueryLinks on QueryBuilder<FinancialTransaction,
       QAfterFilterCondition> relatedDebtIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.linkLength(r'relatedDebt', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedSaving(FilterQuery<Saving> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'relatedSaving');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> relatedSavingIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'relatedSaving', 0, true, 0, true);
     });
   }
 }

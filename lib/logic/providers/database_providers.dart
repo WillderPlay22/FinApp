@@ -6,6 +6,7 @@ import '../../data/daos/recurring_dao.dart';
 import '../../data/daos/expense_dao.dart';
 import '../../data/daos/category_dao.dart';
 import '../../data/daos/debt_dao.dart';
+import '../../data/daos/savings_dao.dart';
 import '../../data/models/debt.dart';
 import '../../data/models/transaction.dart';
 
@@ -62,4 +63,10 @@ final allDebtsProvider = StreamProvider<List<Debt>>((ref) {
 final debtTransactionsProvider = StreamProvider.family<List<FinancialTransaction>, int>((ref, debtId) {
   final dao = ref.watch(debtDaoProvider);
   return dao.watchTransactionsForDebt(debtId);
+});
+
+// 10. Proveedor del DAO de Ahorros (NUEVO)
+final savingsDaoProvider = Provider<SavingsDao>((ref) {
+  final isarService = ref.watch(isarServiceProvider);
+  return SavingsDao(isarService, ref);
 });

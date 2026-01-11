@@ -7,13 +7,13 @@ import 'config/theme/app_theme.dart';
 import 'ui/home/home_screen.dart';
 import 'ui/expenses/expenses_screen.dart';
 import 'ui/income/income_screen.dart';
+import 'ui/savings/savings_screen.dart';
 import 'logic/providers/time_provider.dart';
 import 'data/local_db/isar_db.dart';
 import 'logic/services/category_seeder.dart';
 import 'logic/services/notification_service.dart';
 import 'ui/income/modals/recurring_detail_modal.dart';
 import 'data/models/recurring_movement.dart'; 
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -48,20 +48,13 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
-  // Pantalla de Ahorro (Placeholder)
-  // ✅ Se cambia a 'final' porque AppBar no es un constructor 'const'.
-  static final Widget _savingsScreen = Scaffold(
-    appBar: AppBar(title: const Text("Ahorro")),
-    body: const Center(child: Icon(FontAwesomeIcons.piggyBank, size: 60, color: Colors.pinkAccent)),
-  );
-
   // Lista de las 4 pantallas principales
   // ✅ Se cambia a 'final' porque contiene '_savingsScreen' que ya no es 'const'.
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(),     // La nueva pantalla de inicio
     const ExpensesScreen(), // Tu pantalla de gastos existente
     const IncomeScreen(),   // Tu pantalla de ingresos existente
-    _savingsScreen,
+    const SavingsScreen(),  // ✅ Módulo de Ahorro Real
   ];
 
   @override

@@ -1,6 +1,7 @@
 enum TransactionType {
   income, // Para Ingresos
-  expense // Para Gastos
+  expense, // Para Gastos
+  saving // Para Ahorros
 }
 
 enum Frequency {
@@ -10,4 +11,14 @@ enum Frequency {
   biweekly,  // Quincenal (Vital para tu planificación)
   monthly,   // Mensual
   yearly     // Anual
+}
+
+enum SavingType {
+  goal, // Meta (Con tope)
+  fund  // Fondo (Indefinido)
+}
+
+enum SavingMethod {
+  fixed,      // Monto Fijo
+  percentage  // Porcentaje del remanente
 }

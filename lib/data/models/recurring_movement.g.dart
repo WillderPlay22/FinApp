@@ -206,10 +206,12 @@ const _RecurringMovementfrequencyValueEnumMap = {
 const _RecurringMovementtypeEnumValueMap = {
   r'income': r'income',
   r'expense': r'expense',
+  r'saving': r'saving',
 };
 const _RecurringMovementtypeValueEnumMap = {
   r'income': TransactionType.income,
   r'expense': TransactionType.expense,
+  r'saving': TransactionType.saving,
 };
 
 Id _recurringMovementGetId(RecurringMovement object) {

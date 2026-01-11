@@ -13,8 +13,18 @@ import 'create_category_modal.dart';
 class AddExpenseModal extends ConsumerStatefulWidget {
   final Expense? expenseToEdit; 
   final Category? preSelectedCategory; // ✅ NUEVO: Para pre-llenar categoría
+  final double? maxAmount; // ✅ NUEVO: Límite para cuando se usa desde ahorros
+  final bool isFromSaving; // ✅ NUEVO: Indica si viene de "Usar Ahorro"
+  final Function(double amount)? onExpenseSaved; // ✅ NUEVO: Callback al guardar
 
-  const AddExpenseModal({super.key, this.expenseToEdit, this.preSelectedCategory});
+  const AddExpenseModal({
+    super.key, 
+    this.expenseToEdit, 
+    this.preSelectedCategory,
+    this.maxAmount,
+    this.isFromSaving = false,
+    this.onExpenseSaved,
+  });
 
   @override
   ConsumerState<AddExpenseModal> createState() => _AddExpenseModalState();
@@ -44,6 +54,9 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
         _selectedCategory = widget.preSelectedCategory;
         _isFixedExpense = true; // Asumimos que es fijo si viene de ahí
       }
+      if (widget.isFromSaving) {
+        _isFixedExpense = false; // Si viene de ahorro, siempre es gasto extra
+      }
     }
   }
   
@@ -71,7 +84,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             children: [
               Text(isEditing ? "Editar Item" : "Registrar Gasto", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colors.primary)),
               // Si ya venimos con categoría preseleccionada, bloqueamos el switch
-              if (!isEditing && widget.preSelectedCategory == null)
+              if (!isEditing && widget.preSelectedCategory == null && !widget.isFromSaving)
                 Container(
                   decoration: BoxDecoration(color: colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
                   child: Row(
@@ -99,7 +112,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.red),
             decoration: InputDecoration(
-              hintText: "0.00",
+              hintText: widget.maxAmount != null ? "Máx ${widget.maxAmount}" : "0.00",
               prefixIcon: const Icon(Icons.attach_money, color: Colors.red),
               border: InputBorder.none,
               hintStyle: TextStyle(color: colors.outline.withAlpha((255 * 0.3).round())),
@@ -294,6 +307,11 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) return;
 
+    if (widget.maxAmount != null && amount > widget.maxAmount!) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("El monto excede el saldo disponible en el ahorro.")));
+      return;
+    }
+
     ref.read(expenseDaoProvider).saveExpense(
       id: widget.expenseToEdit?.id,
       title: _noteController.text,
@@ -304,6 +322,11 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       // Si es fijo, usamos la frecuencia de la categoría, si no, mensual por defecto
       frequency: _isFixedExpense ? (_selectedCategory!.frequency ?? Frequency.monthly) : Frequency.monthly,
     );
+
+    if (widget.onExpenseSaved != null) {
+      widget.onExpenseSaved!(amount);
+    }
+
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guardado correctamente")));
   }

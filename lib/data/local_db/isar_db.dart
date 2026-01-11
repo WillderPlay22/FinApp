@@ -7,6 +7,7 @@ import '../models/recurring_movement.dart';
 import '../models/category.dart';
 import '../models/expense.dart';
 import '../models/debt.dart'; // Import the new Debt model
+import '../models/saving.dart';
 
 class IsarService {
   late Future<Isar> db;
@@ -29,6 +30,7 @@ class IsarService {
           CategorySchema,
           ExpenseSchema,
           DebtSchema, // Add DebtSchema
+          SavingSchema,
         ], 
         directory: dir.path,
         inspector: true, // Nos permite ver la BD mientras programamos

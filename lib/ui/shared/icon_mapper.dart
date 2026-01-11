@@ -15,6 +15,12 @@ const List<IconData> _registeredIcons = [
   // For example, from income categories or default seeders.
   FontAwesomeIcons.moneyBillWave,
   FontAwesomeIcons.moneyBill,
+  FontAwesomeIcons.piggyBank,
+  FontAwesomeIcons.laptop,
+  FontAwesomeIcons.coins,
+  FontAwesomeIcons.sackDollar,
+  FontAwesomeIcons.building,
+  FontAwesomeIcons.umbrellaBeach,
   FontAwesomeIcons.question, // A good fallback
 ];
 

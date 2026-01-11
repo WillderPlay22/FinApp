@@ -16,6 +16,7 @@ const List<IconData> _registeredIcons = [
   FontAwesomeIcons.moneyBillWave,
   FontAwesomeIcons.moneyBill,
   FontAwesomeIcons.piggyBank,
+  FontAwesomeIcons.fileInvoiceDollar, // ✅ Agregado para las deudas
   FontAwesomeIcons.laptop,
   FontAwesomeIcons.coins,
   FontAwesomeIcons.sackDollar,

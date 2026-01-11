@@ -39,16 +39,12 @@ class FixedCategoryDetailModal extends ConsumerWidget {
       stream: categoryStream,
       builder: (context, categorySnapshot) {
         // Mientras los datos cargan o si hay un error, mostramos un indicador.
-        if (!categorySnapshot.hasData) {
+        if (categorySnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         final category = categorySnapshot.data;
         if (category == null) {
-          // Esto puede pasar si la categoría se borra mientras el modal está abierto.
-          // Cerramos el modal para evitar errores.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if(context.mounted) Navigator.of(context).pop();
-          });
+          // Si la categoría es null (se borró), mostramos un contenedor vacío mientras el modal se cierra manualmente.
           return const SizedBox.shrink();
         }
 
@@ -120,13 +116,14 @@ class FixedCategoryDetailModal extends ConsumerWidget {
 
                         // Se comprueba que el widget sigue montado ANTES de la operación asíncrona.
                         if (confirm == true && context.mounted) {
-                          // El modal se cerrará automáticamente porque el stream de `category` emitirá null.
+                          final navigator = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
+                          
                           await ref.read(expenseDaoProvider).deleteCategoryAndRelatedData(categoryId);
-                          // Se vuelve a comprobar DESPUÉS del await para mostrar el SnackBar de forma segura.
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Categoría eliminada con éxito.")));
-                          }
+                          
+                          navigator.pop(); // Cerramos el modal explícitamente
+                          messenger.showSnackBar(
+                              const SnackBar(content: Text("Categoría eliminada con éxito.")));
                         }
                       },
                     ),

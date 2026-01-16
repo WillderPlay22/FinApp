@@ -290,7 +290,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
               ElevatedButton(
                 onPressed: _isFormValid ? _showSummary : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE17055), // Terracota
+                  backgroundColor: const Color(0xFFD35400), // Terracota
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                 ),

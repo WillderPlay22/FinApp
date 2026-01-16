@@ -81,7 +81,7 @@ class _IncomeSummaryHeaderState extends ConsumerState<IncomeSummaryHeader> {
             _SummaryCard(
               title: "Cobrado",
               amountAsync: widget.executedTotal,
-              color: const Color(0xFF1DD1A1), // Esmeralda
+              color: const Color(0xFF00B894), // Esmeralda
             ),
             const Gap(12),
             _SummaryCard(
@@ -98,7 +98,7 @@ class _IncomeSummaryHeaderState extends ConsumerState<IncomeSummaryHeader> {
           child: _SummaryCard(
             title: "Total Recibido",
             amountAsync: widget.historyTotal,
-            color: const Color(0xFF1DD1A1), // Esmeralda
+            color: const Color(0xFF00B894), // Esmeralda
             isEnlarged: true,
           ),
         );

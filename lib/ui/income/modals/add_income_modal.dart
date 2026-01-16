@@ -28,11 +28,12 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
 
   // Variables Recurrente
   Frequency _selectedFrequency = Frequency.biweekly;
-  int _selectedDayOfWeek = 1; 
+  int _selectedDayOfWeek = 1;
   int _selectedDayOfMonth = 1;
   final TextEditingController _amount15Controller = TextEditingController();
   final TextEditingController _amountLastController = TextEditingController();
-  final TextEditingController _recurringAmountController = TextEditingController();
+  final TextEditingController _recurringAmountController =
+      TextEditingController();
   bool _isDailyVariable = false;
   bool _isFormValid = false;
 
@@ -60,7 +61,10 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     bool isValid = false;
     if (_isRecurring) {
       if (_titleController.text.isNotEmpty) {
-        isValid = _selectedFrequency == Frequency.biweekly ? (_amount15Controller.text.isNotEmpty && _amountLastController.text.isNotEmpty) : _recurringAmountController.text.isNotEmpty;
+        isValid = _selectedFrequency == Frequency.biweekly
+            ? (_amount15Controller.text.isNotEmpty &&
+                _amountLastController.text.isNotEmpty)
+            : _recurringAmountController.text.isNotEmpty;
       }
     } else {
       isValid = _amountController.text.isNotEmpty;
@@ -95,50 +99,61 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
               children: [
                 Text(
                   _isRecurring ? "Ingreso Fijo" : "Ingreso Extra",
-                  style: textStyles.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: textStyles.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 Row(
                   children: [
-                    Text("Extra", style: TextStyle(
-                      fontWeight: !_isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: !_isRecurring ? const Color(0xFF1DD1A1) : colors.outline
-                    )),
+                    Text("Extra",
+                        style: TextStyle(
+                            fontWeight: !_isRecurring
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: !_isRecurring
+                                ? const Color(0xFF00B894)
+                                : colors.outline)),
                     Switch(
                       value: _isRecurring,
                       onChanged: (value) {
                         setState(() => _isRecurring = value);
                         _validateForm();
                       },
-                      activeTrackColor: const Color(0xFF1DD1A1), // Esmeralda
+                      activeTrackColor: const Color(0xFF00B894), // Esmeralda
                     ),
-                    Text("Fijo", style: TextStyle(
-                      fontWeight: _isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: _isRecurring ? const Color(0xFF1DD1A1) : colors.outline
-                    )),
+                    Text("Fijo",
+                        style: TextStyle(
+                            fontWeight: _isRecurring
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _isRecurring
+                                ? const Color(0xFF00B894)
+                                : colors.outline)),
                   ],
                 ),
               ],
             ),
-            
+
             const Divider(),
             const Gap(10),
 
-            if (_isRecurring) 
-              _buildRecurringForm(colors) 
-            else 
+            if (_isRecurring)
+              _buildRecurringForm(colors)
+            else
               _buildEventualForm(colors),
-            
+
             const Gap(20),
 
             ElevatedButton(
               onPressed: _isFormValid ? _saveData : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1DD1A1), // Esmeralda
+                backgroundColor: const Color(0xFF00B894), // Esmeralda
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text("GUARDAR", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: const Text("GUARDAR",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -158,25 +173,31 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
       if (_isRecurring) {
         // --- GUARDAR INGRESO FIJO ---
         final recurringDao = ref.read(recurringDaoProvider);
-        
+
         List<int> paymentDays = [];
         List<double> paymentAmounts = [];
         double accumulated = 0;
 
         if (_selectedFrequency == Frequency.biweekly) {
-          paymentDays = [15, -1]; 
+          paymentDays = [15, -1];
           final m15 = double.tryParse(_amount15Controller.text) ?? 0;
           final mLast = double.tryParse(_amountLastController.text) ?? 0;
           paymentAmounts = [m15, mLast];
         } else if (_selectedFrequency == Frequency.monthly) {
           paymentDays = [_selectedDayOfMonth];
-          paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
+          paymentAmounts = [
+            double.tryParse(_recurringAmountController.text) ?? 0
+          ];
         } else if (_selectedFrequency == Frequency.weekly) {
           paymentDays = [_selectedDayOfWeek];
-          paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
+          paymentAmounts = [
+            double.tryParse(_recurringAmountController.text) ?? 0
+          ];
         } else if (_selectedFrequency == Frequency.daily) {
           if (!_isDailyVariable) {
-             paymentAmounts = [double.tryParse(_recurringAmountController.text) ?? 0];
+            paymentAmounts = [
+              double.tryParse(_recurringAmountController.text) ?? 0
+            ];
           } else {
             accumulated = double.tryParse(_recurringAmountController.text) ?? 0;
           }
@@ -190,7 +211,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..paymentAmounts = paymentAmounts
           ..isVariableDaily = _isDailyVariable
           ..accumulatedAmount = accumulated
-          ..nextPaymentDate = DateTime.now(); 
+          ..nextPaymentDate = DateTime.now();
 
         // 1. Guardar en Base de Datos
         await recurringDao.addRecurringMovement(newRecurring);
@@ -199,19 +220,20 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         // Obtenemos todos los ingresos activos y reprogramamos sus alarmas
         final allIncomes = await recurringDao.getAllRecurringMovements();
         await NotificationService().scheduleAllNotifications(allIncomes);
-
       } else {
         // --- GUARDAR INGRESO EXTRA ---
         final transactionDao = ref.read(transactionDaoProvider);
 
         final newTransaction = FinancialTransaction()
           ..amount = double.parse(_amountController.text)
-          ..note = _titleController.text.isEmpty ? "Ingreso Extra" : _titleController.text
+          ..note = _titleController.text.isEmpty
+              ? "Ingreso Extra"
+              : _titleController.text
           ..date = _selectedDate
           ..type = TransactionType.income
           ..categoryName = "Extra"
           ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
-          ..colorValue = 0xFF1DD1A1; // Esmeralda
+          ..colorValue = 0xFF00B894; // Esmeralda
 
         await transactionDao.addTransaction(newTransaction);
       }
@@ -222,7 +244,6 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           const SnackBar(content: Text("¡Ingreso guardado exitosamente!")),
         );
       }
-
     } catch (e) {
       debugPrint("Error al guardar: $e");
     }
@@ -231,7 +252,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
   // ===========================================================================
   // FORMULARIOS VISUALES
   // ===========================================================================
-  
+
   Widget _buildEventualForm(ColorScheme colors) {
     return Column(
       children: [
@@ -260,18 +281,21 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
             decoration: BoxDecoration(
-              border: Border.all(color: colors.outline.withAlpha((255 * 0.5).round())),
+              border: Border.all(
+                  color: colors.outline.withAlpha((255 * 0.5).round())),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(FontAwesomeIcons.calendarDay, color: Color(0xFF1DD1A1)),
+                const Icon(FontAwesomeIcons.calendarDay,
+                    color: Color(0xFF00B894)),
                 const Gap(10),
                 Expanded(
                   child: Text(
-                    isDateToday(_selectedDate) 
+                    isDateToday(_selectedDate)
                         ? "Hoy (${DateFormat('dd/MM').format(_selectedDate)})"
-                        : DateFormat('EEEE d, MMM yyyy', 'es').format(_selectedDate),
+                        : DateFormat('EEEE d, MMM yyyy', 'es')
+                            .format(_selectedDate),
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
@@ -297,14 +321,16 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         ),
         const Gap(15),
         DropdownButtonFormField<Frequency>(
-          value: _selectedFrequency,
+          initialValue: _selectedFrequency,
           decoration: InputDecoration(
             labelText: "Frecuencia de Cobro",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             prefixIcon: const Icon(FontAwesomeIcons.clock, size: 18),
           ),
           items: const [
-            DropdownMenuItem(value: Frequency.biweekly, child: Text("Quincenal (15 y Último)")),
+            DropdownMenuItem(
+                value: Frequency.biweekly,
+                child: Text("Quincenal (15 y Último)")),
             DropdownMenuItem(value: Frequency.monthly, child: Text("Mensual")),
             DropdownMenuItem(value: Frequency.weekly, child: Text("Semanal")),
             DropdownMenuItem(value: Frequency.daily, child: Text("Diario")),
@@ -327,10 +353,14 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_selectedFrequency == Frequency.biweekly) _buildBiweeklyForm(colors),
-              if (_selectedFrequency == Frequency.monthly) _buildMonthlyForm(colors),
-              if (_selectedFrequency == Frequency.weekly) _buildWeeklyForm(colors),
-              if (_selectedFrequency == Frequency.daily) _buildDailyForm(colors),
+              if (_selectedFrequency == Frequency.biweekly)
+                _buildBiweeklyForm(colors),
+              if (_selectedFrequency == Frequency.monthly)
+                _buildMonthlyForm(colors),
+              if (_selectedFrequency == Frequency.weekly)
+                _buildWeeklyForm(colors),
+              if (_selectedFrequency == Frequency.daily)
+                _buildDailyForm(colors),
             ],
           ),
         ),
@@ -342,13 +372,17 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Configura tus pagos:", style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text("Configura tus pagos:",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const Gap(10),
         Row(
           children: [
-            Expanded(child: _buildMoneyInput(_amount15Controller, "Día 15", colors)),
+            Expanded(
+                child: _buildMoneyInput(_amount15Controller, "Día 15", colors)),
             const Gap(10),
-            Expanded(child: _buildMoneyInput(_amountLastController, "Día Último", colors)),
+            Expanded(
+                child: _buildMoneyInput(
+                    _amountLastController, "Día Último", colors)),
           ],
         ),
       ],
@@ -359,13 +393,15 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("¿Qué día del mes cobras?", style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text("¿Qué día del mes cobras?",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const Gap(10),
         DropdownButtonFormField<int>(
-          value: _selectedDayOfMonth,
+          initialValue: _selectedDayOfMonth,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
           ),
           items: List.generate(31, (index) => index + 1).map((day) {
             return DropdownMenuItem(value: day, child: Text("Día $day"));
@@ -383,7 +419,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("¿Qué día de la semana?", style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text("¿Qué día de la semana?",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const Gap(10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -393,7 +430,9 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
               onTap: () => setState(() => _selectedDayOfWeek = index + 1),
               child: CircleAvatar(
                 radius: 18,
-                backgroundColor: isSelected ? const Color(0xFF1DD1A1) : colors.surfaceContainerHighest,
+                backgroundColor: isSelected
+                    ? const Color(0xFF00B894)
+                    : colors.surfaceContainerHighest,
                 foregroundColor: isSelected ? Colors.white : colors.onSurface,
                 child: Text(days[index], style: const TextStyle(fontSize: 12)),
               ),
@@ -418,15 +457,17 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
         ),
         const Gap(10),
         _buildMoneyInput(
-          _recurringAmountController, 
-          _isDailyVariable ? "Promedio Diario (Estimado)" : "Monto Fijo Diario", 
-          colors
-        ),
+            _recurringAmountController,
+            _isDailyVariable
+                ? "Promedio Diario (Estimado)"
+                : "Monto Fijo Diario",
+            colors),
       ],
     );
   }
 
-  Widget _buildMoneyInput(TextEditingController controller, String label, ColorScheme colors) {
+  Widget _buildMoneyInput(
+      TextEditingController controller, String label, ColorScheme colors) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
@@ -443,6 +484,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
 
   bool isDateToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 }

@@ -18,9 +18,17 @@ import 'widgets/fixed_expenses_list.dart';
 // ✅ CORREGIDO: Se cambia la implementación para mover la lógica de transformación
 // del DAO al provider. Esto mejora la separación de responsabilidades y evita
 // el error que causaba la carga infinita.
-final _categorizedFixedProjectionProvider = StreamProvider<Map<String, ({double total, int color})>>((ref) {
+final _categorizedFixedProjectionProvider =
+    StreamProvider<Map<String, ({double total, int color})>>((ref) {
   final expenseDao = ref.watch(expenseDaoProvider);
-  // 1. Observamos la lista "cruda" de gastos fijos.
+
+  // Combine triggers: We want to rebuild if Expenses change OR Categories change.
+  // Since we can't easily combine streams in the return, we listen to categories
+  // to invalidate/rebuild this provider, or use a combined stream.
+
+  // Trick: Watch categories stream. Value presence forces rebuild on change.
+  ref.watch(categoryMapProvider); // We'll create this or use a raw stream
+
   return expenseDao.watchFixedExpenses().map((fixedExpenses) {
     // 2. Transformamos la lista en el mapa que necesita el gráfico.
     final Map<String, ({double total, int color})> projectionMap = {};
@@ -28,45 +36,68 @@ final _categorizedFixedProjectionProvider = StreamProvider<Map<String, ({double 
       final category = expense.category.value;
       if (category == null) continue;
       final monthlyAmount = expenseDao.getMonthlyAmount(expense);
-      final current = projectionMap[category.name] ?? (total: 0.0, color: category.colorValue);
-      projectionMap[category.name] = (total: current.total + monthlyAmount, color: category.colorValue);
+      final current = projectionMap[category.name] ??
+          (total: 0.0, color: category.colorValue);
+      projectionMap[category.name] =
+          (total: current.total + monthlyAmount, color: category.colorValue);
     }
     return projectionMap;
   });
 });
 
-final _categorizedExtrasInDateRangeProvider = StreamProvider.family<Map<String, ({double total, int color})>, DateRange>((ref, range) {
+// Helper provider to watch categories (forces rebuild on change)
+final categoryMapProvider = StreamProvider(
+    (ref) => ref.watch(categoryDaoProvider).watchExpenseCategories());
+
+final _categorizedExtrasInDateRangeProvider =
+    StreamProvider.family<Map<String, ({double total, int color})>, DateRange>(
+        (ref, range) {
   return ref.watch(expenseDaoProvider).watchCategorizedExtrasInDateRange(range);
 });
 
 // Provider para los datos del gráfico de la pestaña "Categorías" (Proyección)
-final categoryChartDataProvider = Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
+final categoryChartDataProvider =
+    Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
   final now = ref.watch(nowProvider);
   final monthRange = getCycleDateRange(now, Frequency.monthly);
 
   // Observamos los providers de stream intermedios
   final fixedAsync = ref.watch(_categorizedFixedProjectionProvider);
-  final extrasAsync = ref.watch(_categorizedExtrasInDateRangeProvider(monthRange));
+  final extrasAsync =
+      ref.watch(_categorizedExtrasInDateRangeProvider(monthRange));
 
   // Combinar los datos de gastos fijos proyectados y gastos extras del mes
   // Ahora 'fixedAsync' y 'extrasAsync' son AsyncValue, por lo que esta lógica es correcta.
-  if (fixedAsync.isLoading || extrasAsync.isLoading) return const AsyncValue.loading();
-  if (fixedAsync.hasError) return AsyncValue.error(fixedAsync.error!, fixedAsync.stackTrace!);
-  if (extrasAsync.hasError) return AsyncValue.error(extrasAsync.error!, extrasAsync.stackTrace!);
+  if (fixedAsync.isLoading || extrasAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (fixedAsync.hasError) {
+    return AsyncValue.error(fixedAsync.error!, fixedAsync.stackTrace!);
+  }
+  if (extrasAsync.hasError) {
+    return AsyncValue.error(extrasAsync.error!, extrasAsync.stackTrace!);
+  }
 
   final fixedData = fixedAsync.value ?? {};
   final extrasData = extrasAsync.value ?? {};
   final combined = {...fixedData};
   extrasData.forEach((key, value) {
-    combined.update(key, (existing) => (total: existing.total + value.total, color: existing.color), ifAbsent: () => value);
+    combined.update(
+        key,
+        (existing) =>
+            (total: existing.total + value.total, color: existing.color),
+        ifAbsent: () => value);
   });
   return AsyncValue.data(combined);
 });
 
 // Provider para los datos del gráfico de la pestaña "Historial" (Ejecutado)
-final historyChartDataProvider = StreamProvider<Map<String, ({double total, int color})>>((ref) {
+final historyChartDataProvider =
+    StreamProvider<Map<String, ({double total, int color})>>((ref) {
   final range = ref.watch(historyDateRangeProvider);
-  return ref.watch(expenseDaoProvider).watchCategorizedSummaryInDateRange(range);
+  return ref
+      .watch(expenseDaoProvider)
+      .watchCategorizedSummaryInDateRange(range);
 });
 
 // Provider para el total del historial (Ejecutado en un rango)
@@ -76,7 +107,8 @@ final historyTotalProvider = Provider<AsyncValue<double>>((ref) {
 
   // Cuando el provider del gráfico tenga datos, los sumamos.
   return historyChartAsync.when(
-    data: (data) => AsyncValue.data(data.values.fold(0.0, (sum, e) => sum + e.total)),
+    data: (data) =>
+        AsyncValue.data(data.values.fold(0.0, (sum, e) => sum + e.total)),
     loading: () => const AsyncValue.loading(),
     error: (err, stack) => AsyncValue.error(err, stack),
   );
@@ -90,16 +122,28 @@ final projectedTotalProvider = Provider<AsyncValue<double>>((ref) {
   final fixedProjectionAsync = ref.watch(_categorizedFixedProjectionProvider);
   final now = ref.watch(nowProvider);
   final monthRange = getCycleDateRange(now, Frequency.monthly);
-  final extrasAsync = ref.watch(_categorizedExtrasInDateRangeProvider(monthRange));
+  final extrasAsync =
+      ref.watch(_categorizedExtrasInDateRangeProvider(monthRange));
 
   // Manejamos los estados de carga y error.
-  if (fixedProjectionAsync.isLoading || extrasAsync.isLoading) return const AsyncValue.loading();
-  if (fixedProjectionAsync.hasError) return AsyncValue.error(fixedProjectionAsync.error!, fixedProjectionAsync.stackTrace!);
-  if (extrasAsync.hasError) return AsyncValue.error(extrasAsync.error!, extrasAsync.stackTrace!);
+  if (fixedProjectionAsync.isLoading || extrasAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (fixedProjectionAsync.hasError) {
+    return AsyncValue.error(
+        fixedProjectionAsync.error!, fixedProjectionAsync.stackTrace!);
+  }
+  if (extrasAsync.hasError) {
+    return AsyncValue.error(extrasAsync.error!, extrasAsync.stackTrace!);
+  }
 
   // Sumamos los totales de ambos streams.
-  final fixedTotal = fixedProjectionAsync.value?.values.fold<double>(0.0, (sum, e) => sum + e.total) ?? 0.0;
-  final extrasTotal = extrasAsync.value?.values.fold<double>(0.0, (sum, e) => sum + e.total) ?? 0.0;
+  final fixedTotal = fixedProjectionAsync.value?.values
+          .fold<double>(0.0, (sum, e) => sum + e.total) ??
+      0.0;
+  final extrasTotal =
+      extrasAsync.value?.values.fold<double>(0.0, (sum, e) => sum + e.total) ??
+          0.0;
 
   return AsyncValue.data(fixedTotal + extrasTotal);
 });
@@ -120,18 +164,27 @@ final debtPendingTotalProvider = StreamProvider<double>((ref) {
   return ref.watch(debtDaoProvider).watchDebtPendingThisMonth(now);
 });
 
-final debtChartDataProvider = Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
+final debtChartDataProvider =
+    Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
   final paidAsync = ref.watch(debtPaidTotalProvider);
   final pendingAsync = ref.watch(debtPendingTotalProvider);
 
-  if (paidAsync.isLoading || pendingAsync.isLoading) return const AsyncValue.loading();
+  if (paidAsync.isLoading || pendingAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
 
   final paid = paidAsync.value ?? 0.0;
   final pending = pendingAsync.value ?? 0.0;
 
   return AsyncValue.data({
-    "Pagado": (total: paid, color: const Color(0xFF1DD1A1).value), // Esmeralda
-    "Pendiente": (total: pending, color: const Color(0xFFE17055).value), // Terracota
+    "Pagado": (
+      total: paid,
+      color: const Color(0xFF00B894).toARGB32()
+    ), // Esmeralda
+    "Pendiente": (
+      total: pending,
+      color: const Color(0xFFD35400).toARGB32()
+    ), // Terracota
   });
 });
 
@@ -144,7 +197,8 @@ class ExpensesScreen extends ConsumerStatefulWidget {
   ConsumerState<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTickerProviderStateMixin {
+class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   // Se guarda la función del listener para poder removerla correctamente en el dispose.
   late final VoidCallback _tabListener;
@@ -152,7 +206,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Cambiado a 3 pestañas
+    _tabController =
+        TabController(length: 3, vsync: this); // Cambiado a 3 pestañas
     // Se define y añade el listener.
     _tabListener = () => setState(() {});
     _tabController.addListener(_tabListener);
@@ -183,9 +238,15 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
     }
 
     // Selección de totales según la pestaña
-    final projectedTotalAsync = (tabIndex == 1) ? ref.watch(debtPendingTotalProvider) : ref.watch(projectedTotalProvider);
-    final executedTotalAsync = (tabIndex == 1) ? ref.watch(debtPaidTotalProvider) : ref.watch(executedTotalProvider);
-    final historyTotalAsync = (tabIndex == 1) ? const AsyncValue.data(0.0) : ref.watch(historyTotalProvider);
+    final projectedTotalAsync = (tabIndex == 1)
+        ? ref.watch(debtPendingTotalProvider)
+        : ref.watch(projectedTotalProvider);
+    final executedTotalAsync = (tabIndex == 1)
+        ? ref.watch(debtPaidTotalProvider)
+        : ref.watch(executedTotalProvider);
+    final historyTotalAsync = (tabIndex == 1)
+        ? const AsyncValue.data(0.0)
+        : ref.watch(historyTotalProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -195,10 +256,13 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           // ✅ Se añade un key para que Flutter sepa que el TabBar en sí no cambia
           key: const ValueKey('expenses_tab_bar'),
           controller: _tabController,
-          tabs: const [ // Se añade la pestaña de Deudas
+          tabs: const [
+            // Se añade la pestaña de Deudas
             Tab(text: "Categorías", icon: Icon(FontAwesomeIcons.layerGroup)),
             Tab(text: "Deudas", icon: Icon(FontAwesomeIcons.fileInvoiceDollar)),
-            Tab(text: "Historial", icon: Icon(FontAwesomeIcons.clockRotateLeft)),
+            Tab(
+                text: "Historial",
+                icon: Icon(FontAwesomeIcons.clockRotateLeft)),
           ],
         ),
       ),
@@ -214,9 +278,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [ // Se añade la vista de Deudas
-                FixedExpensesList(), 
-                DebtsList(), 
+              children: const [
+                // Se añade la vista de Deudas
+                FixedExpensesList(),
+                DebtsList(),
                 ExpenseHistoryList()
               ],
             ),
@@ -249,7 +314,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           ),
           label: const Text("Gasto"),
           icon: const Icon(Icons.add),
-          backgroundColor: const Color(0xFFFF6B6B), // Coral
+          backgroundColor: const Color(0xFFE74C3C), // Coral
         );
       case 1: // Pestaña "Deudas"
         return FloatingActionButton.extended(
@@ -261,10 +326,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
               useSafeArea: true,
               builder: (ctx) => const AddDebtModal(),
             );
-          }, 
+          },
           label: const Text("Deuda"),
           icon: const Icon(Icons.add),
-          backgroundColor: const Color(0xFFE17055), // Terracota
+          backgroundColor: const Color(0xFFD35400), // Terracota
         );
       case 2: // Pestaña "Historial"
       default:

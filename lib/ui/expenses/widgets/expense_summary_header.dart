@@ -25,7 +25,7 @@ class ExpenseSummaryHeader extends ConsumerWidget {
                   title: "Ejecutado",
                   amount: total,
                   icon: FontAwesomeIcons.moneyBillTrendUp,
-                  color: const Color(0xFFFF6B6B), // Coral
+                  color: const Color(0xFFE74C3C), // Coral
                   isFilled: true,
                 );
               },

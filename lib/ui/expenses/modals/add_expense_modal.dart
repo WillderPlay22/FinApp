@@ -129,10 +129,10 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Color(0xFFFF6B6B)),
+            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Color(0xFFE74C3C)),
             decoration: InputDecoration(
               hintText: widget.maxAmount != null ? "Máx ${widget.maxAmount}" : "0.00",
-              prefixIcon: const Icon(Icons.attach_money, color: Color(0xFFFF6B6B)),
+              prefixIcon: const Icon(Icons.attach_money, color: Color(0xFFE74C3C)),
               border: InputBorder.none,
               hintStyle: TextStyle(color: colors.outline.withAlpha((255 * 0.3).round())),
             ),
@@ -171,7 +171,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             child: ElevatedButton(
               onPressed: _isFormValid ? _saveExpense : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B), // Coral
+                backgroundColor: const Color(0xFFE74C3C), // Coral
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -185,8 +185,8 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             const Gap(10),
             TextButton.icon(
               onPressed: _deleteExpense,
-              icon: const Icon(Icons.delete, color: Color(0xFFFF6B6B)),
-              label: const Text("Eliminar este Item", style: TextStyle(color: Color(0xFFFF6B6B))),
+              icon: const Icon(Icons.delete, color: Color(0xFFE74C3C)),
+              label: const Text("Eliminar este Item", style: TextStyle(color: Color(0xFFE74C3C))),
             )
           ],
           const Gap(20),

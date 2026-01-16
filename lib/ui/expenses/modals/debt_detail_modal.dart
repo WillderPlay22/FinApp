@@ -68,7 +68,7 @@ class DebtDetailModal extends ConsumerWidget {
 
   Widget _buildHeader(BuildContext context, WidgetRef ref, Debt debt) {
     final colors = Theme.of(context).colorScheme;
-    final cardColor = const Color(0xFFE17055); // Terracota
+    const cardColor = Color(0xFFD35400); // Terracota
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -78,14 +78,19 @@ class DebtDetailModal extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(FontAwesomeIcons.fileInvoiceDollar, color: cardColor, size: 30),
+          const Icon(FontAwesomeIcons.fileInvoiceDollar,
+              color: cardColor, size: 30),
           const Gap(15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(debt.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Text(debt.frequency.name, style: TextStyle(color: colors.outline, letterSpacing: 1.2)),
+                Text(debt.title,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(debt.frequency.name,
+                    style:
+                        TextStyle(color: colors.outline, letterSpacing: 1.2)),
               ],
             ),
           ),
@@ -104,10 +109,17 @@ class DebtDetailModal extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("¿Eliminar deuda?"),
-        content: Text("Se borrará la deuda '${debt.title}' y todo su historial de pagos.\n\nEsta acción no se puede deshacer."),
+        content: Text(
+            "Se borrará la deuda '${debt.title}' y todo su historial de pagos.\n\nEsta acción no se puede deshacer."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text("Eliminar", style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancelar")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text("Eliminar",
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.error))),
         ],
       ),
     );
@@ -118,7 +130,8 @@ class DebtDetailModal extends ConsumerWidget {
     }
   }
 
-  Widget _buildSummarySection(BuildContext context, Debt debt, AsyncValue<List<FinancialTransaction>> transactionsAsync) {
+  Widget _buildSummarySection(BuildContext context, Debt debt,
+      AsyncValue<List<FinancialTransaction>> transactionsAsync) {
     final colors = Theme.of(context).colorScheme;
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$');
 
@@ -131,25 +144,43 @@ class DebtDetailModal extends ConsumerWidget {
       child: transactionsAsync.when(
         data: (transactions) {
           // ✅ CORRECCIÓN: El pago inicial ahora es una transacción, así que solo sumamos las transacciones.
-          final totalPaid = transactions.fold(0.0, (sum, tx) => sum + tx.amount);
+          final totalPaid =
+              transactions.fold(0.0, (sum, tx) => sum + tx.amount);
           // Use the original amount for a stable calculation of paid installments, robust against partial payments.
-          final baseInstallmentAmount = debt.originalInstallmentAmount ?? debt.installmentAmount;
-          final installmentsPaid = baseInstallmentAmount > 0 ? ((totalPaid - debt.initialPayment) / baseInstallmentAmount).floor() : 0;
+          final baseInstallmentAmount =
+              debt.originalInstallmentAmount ?? debt.installmentAmount;
+          final installmentsPaid = baseInstallmentAmount > 0
+              ? ((totalPaid - debt.initialPayment) / baseInstallmentAmount)
+                  .floor()
+              : 0;
 
           return Column(
             children: [
-              _SummaryRow(label: "Próximo Pago:", value: debt.isPaidOff ? "¡Pagada!" : "${DateFormat('dd MMM yyyy', 'es').format(debt.nextPaymentDate!)} - ${currencyFormat.format(debt.installmentAmount)}"),
+              _SummaryRow(
+                  label: "Próximo Pago:",
+                  value: debt.isPaidOff
+                      ? "¡Pagada!"
+                      : "${DateFormat('dd MMM yyyy', 'es').format(debt.nextPaymentDate!)} - ${currencyFormat.format(debt.installmentAmount)}"),
               const Divider(height: 20),
-              _SummaryRow(label: "Total Pagado:", value: currencyFormat.format(totalPaid)),
-              _SummaryRow(label: "Total Pendiente:", value: currencyFormat.format(debt.remainingAmount)),
+              _SummaryRow(
+                  label: "Total Pagado:",
+                  value: currencyFormat.format(totalPaid)),
+              _SummaryRow(
+                  label: "Total Pendiente:",
+                  value: currencyFormat.format(debt.remainingAmount)),
               const Divider(height: 20),
-              _SummaryRow(label: "Monto Total:", value: currencyFormat.format(debt.totalAmount)),
-              _SummaryRow(label: "Cuotas Pagadas:", value: "$installmentsPaid de ${debt.installmentCount}"),
+              _SummaryRow(
+                  label: "Monto Total:",
+                  value: currencyFormat.format(debt.totalAmount)),
+              _SummaryRow(
+                  label: "Cuotas Pagadas:",
+                  value: "$installmentsPaid de ${debt.installmentCount}"),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => const Center(child: Text("Error al cargar pagos.")),
+        error: (err, stack) =>
+            const Center(child: Text("Error al cargar pagos.")),
       ),
     );
   }
@@ -157,7 +188,9 @@ class DebtDetailModal extends ConsumerWidget {
   Widget _buildActions(BuildContext context, WidgetRef ref, Debt debt) {
     final colors = Theme.of(context).colorScheme;
     if (debt.isPaidOff) {
-      return const Center(child: Text("Esta deuda ya ha sido saldada.", style: TextStyle(color: Colors.green)));
+      return const Center(
+          child: Text("Esta deuda ya ha sido saldada.",
+              style: TextStyle(color: Colors.green)));
     }
 
     return Column(
@@ -193,14 +226,18 @@ class DebtDetailModal extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text("Pagar Cuota de ${debt.title}"),
-        content: Text("¿Confirmar pago de \$${debt.installmentAmount.toStringAsFixed(2)}?"),
+        content: Text(
+            "¿Confirmar pago de \$${debt.installmentAmount.toStringAsFixed(2)}?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancelar")),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancelar")),
           ElevatedButton(
             onPressed: () async {
               // 1. Realizar el pago y verificar si se saldó la deuda
-              final isPaidOff = await ref.read(debtDaoProvider).markInstallmentAsPaid(debt);
-              
+              final isPaidOff =
+                  await ref.read(debtDaoProvider).markInstallmentAsPaid(debt);
+
               // 2. Cerrar el diálogo de confirmación
               if (dialogContext.mounted) Navigator.pop(dialogContext);
 
@@ -210,8 +247,10 @@ class DebtDetailModal extends ConsumerWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text("¡Felicidades!"),
-                    content: const Text("Has pagado la totalidad de las cuotas de esta deuda."),
-                    icon: const Icon(Icons.celebration, color: Colors.amber, size: 50),
+                    content: const Text(
+                        "Has pagado la totalidad de las cuotas de esta deuda."),
+                    icon: const Icon(Icons.celebration,
+                        color: Colors.amber, size: 50),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
@@ -229,7 +268,8 @@ class DebtDetailModal extends ConsumerWidget {
     );
   }
 
-  void _showAmortizationOptions(BuildContext context, WidgetRef ref, Debt debt) {
+  void _showAmortizationOptions(
+      BuildContext context, WidgetRef ref, Debt debt) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => Container(
@@ -238,19 +278,26 @@ class DebtDetailModal extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text("Pagar Otro Monto", style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+            Text("Pagar Otro Monto",
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center),
             const Gap(20),
             ListTile(
               leading: const Icon(Icons.next_plan),
               title: const Text("Amortizar a próximas cuotas"),
-              subtitle: const Text("El pago se aplica a las siguientes cuotas hasta cubrirse."),
+              subtitle: const Text(
+                  "El pago se aplica a las siguientes cuotas hasta cubrirse."),
               onTap: () async {
                 Navigator.pop(ctx);
-                final amount = await _showPayAmountDialog(context, "Amortizar a Capital");
+                final amount =
+                    await _showPayAmountDialog(context, "Amortizar a Capital");
                 if (amount != null && amount > 0) {
-                  await ref.read(debtDaoProvider).amortizeToPrincipal(debt, amount);
+                  await ref
+                      .read(debtDaoProvider)
+                      .amortizeToPrincipal(debt, amount);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Amortización registrada.")));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Amortización registrada.")));
                   }
                 }
               },
@@ -258,14 +305,19 @@ class DebtDetailModal extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.view_list),
               title: const Text("Amortizar a todas las cuotas"),
-              subtitle: const Text("El pago se divide entre todas las cuotas restantes, reduciendo su monto."),
+              subtitle: const Text(
+                  "El pago se divide entre todas las cuotas restantes, reduciendo su monto."),
               onTap: () async {
                 Navigator.pop(ctx);
-                final amount = await _showPayAmountDialog(context, "Amortizar a Cuotas");
+                final amount =
+                    await _showPayAmountDialog(context, "Amortizar a Cuotas");
                 if (amount != null && amount > 0) {
-                  await ref.read(debtDaoProvider).amortizeToInstallments(debt, amount);
-                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Amortización registrada.")));
+                  await ref
+                      .read(debtDaoProvider)
+                      .amortizeToInstallments(debt, amount);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Amortización registrada.")));
                   }
                 }
               },
@@ -282,51 +334,58 @@ class DebtDetailModal extends ConsumerWidget {
       context: context,
       builder: (ctx) {
         bool isValid = false;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(title),
-              content: TextFormField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: "Monto a Pagar",
-                  prefixText: "\$",
-                ),
-                autofocus: true,
-                onChanged: (value) {
-                  setState(() {
-                    isValid = value.isNotEmpty && (double.tryParse(value) ?? 0) > 0;
-                  });
-                },
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: Text(title),
+            content: TextFormField(
+              controller: amountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: "Monto a Pagar",
+                prefixText: "\$",
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
-                ElevatedButton(
-                  onPressed: isValid ? () {
-                    final amount = double.tryParse(amountController.text);
-                    Navigator.pop(ctx, amount);
-                  } : null,
-                  child: const Text("Confirmar Pago"),
-                ),
-              ],
-            );
-          }
-        );
+              autofocus: true,
+              onChanged: (value) {
+                setState(() {
+                  isValid =
+                      value.isNotEmpty && (double.tryParse(value) ?? 0) > 0;
+                });
+              },
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancelar")),
+              ElevatedButton(
+                onPressed: isValid
+                    ? () {
+                        final amount = double.tryParse(amountController.text);
+                        Navigator.pop(ctx, amount);
+                      }
+                    : null,
+                child: const Text("Confirmar Pago"),
+              ),
+            ],
+          );
+        });
       },
     );
   }
 
-  Widget _buildHistorySection(BuildContext context, AsyncValue<List<FinancialTransaction>> transactionsAsync) {
+  Widget _buildHistorySection(BuildContext context,
+      AsyncValue<List<FinancialTransaction>> transactionsAsync) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Historial de Pagos", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text("Historial de Pagos",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const Gap(10),
         transactionsAsync.when(
           data: (transactions) {
             if (transactions.isEmpty) {
-              return const Center(child: Padding(
+              return const Center(
+                  child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text("No hay pagos registrados para esta deuda."),
               ));
@@ -336,11 +395,13 @@ class DebtDetailModal extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: transactions.length,
               separatorBuilder: (_, __) => const Gap(8),
-              itemBuilder: (_, index) => _PaymentHistoryItem(transaction: transactions[index]),
+              itemBuilder: (_, index) =>
+                  _PaymentHistoryItem(transaction: transactions[index]),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, stack) => const Center(child: Text("Error al cargar historial.")),
+          error: (err, stack) =>
+              const Center(child: Text("Error al cargar historial.")),
         ),
       ],
     );
@@ -361,7 +422,8 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+          Text(label,
+              style: TextStyle(color: Theme.of(context).colorScheme.outline)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
@@ -399,7 +461,8 @@ class _PaymentHistoryItem extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  DateFormat('dd MMM yyyy - HH:mm', 'es').format(transaction.date),
+                  DateFormat('dd MMM yyyy - HH:mm', 'es')
+                      .format(transaction.date),
                   style: TextStyle(fontSize: 12, color: colors.outline),
                 ),
               ],
@@ -408,7 +471,8 @@ class _PaymentHistoryItem extends StatelessWidget {
           const Gap(10),
           Text(
             currencyFormat.format(transaction.amount),
-            style: TextStyle(fontWeight: FontWeight.bold, color: colors.error, fontSize: 16),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: colors.error, fontSize: 16),
           ),
         ],
       ),

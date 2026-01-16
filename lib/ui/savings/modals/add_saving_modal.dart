@@ -16,12 +16,13 @@ class AddSavingModal extends ConsumerStatefulWidget {
 class _AddSavingModalState extends ConsumerState<AddSavingModal> {
   final _nameController = TextEditingController();
   final _targetController = TextEditingController();
-  final _valueController = TextEditingController(); // Sirve para monto fijo o porcentaje
+  final _valueController =
+      TextEditingController(); // Sirve para monto fijo o porcentaje
 
   SavingType _selectedType = SavingType.goal;
   SavingMethod _selectedMethod = SavingMethod.fixed;
-  int _selectedColor = 0xFF6C5CE7; // Púrpura Real
-  int _selectedIcon = FontAwesomeIcons.piggyBank.codePoint;
+  final int _selectedColor = 0xFF9B59B6; // Púrpura Real
+  final int _selectedIcon = FontAwesomeIcons.piggyBank.codePoint;
   bool _isFormValid = false;
 
   @override
@@ -41,9 +42,12 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
   }
 
   void _validateForm() {
-    bool isValid = _nameController.text.isNotEmpty && _valueController.text.isNotEmpty;
-    if (_selectedType == SavingType.goal) isValid = isValid && _targetController.text.isNotEmpty;
-    
+    bool isValid =
+        _nameController.text.isNotEmpty && _valueController.text.isNotEmpty;
+    if (_selectedType == SavingType.goal) {
+      isValid = isValid && _targetController.text.isNotEmpty;
+    }
+
     if (isValid != _isFormValid) setState(() => _isFormValid = isValid);
   }
 
@@ -53,7 +57,9 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
 
     return Container(
       padding: EdgeInsets.only(
-        top: 20, left: 20, right: 20,
+        top: 20,
+        left: 20,
+        right: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       decoration: BoxDecoration(
@@ -65,7 +71,9 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Nuevo Plan de Ahorro", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            const Text("Nuevo Plan de Ahorro",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center),
             const Gap(20),
 
             // NOMBRE
@@ -74,7 +82,8 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
               decoration: InputDecoration(
                 labelText: "Nombre (Ej: Auto Nuevo, Emergencias)",
                 prefixIcon: const Icon(Icons.label_outline),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const Gap(15),
@@ -83,15 +92,13 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
             Row(
               children: [
                 Expanded(
-                  child: _buildTypeSelector(
-                    "Meta", "Con objetivo", FontAwesomeIcons.flagCheckered, SavingType.goal, colors
-                  ),
+                  child: _buildTypeSelector("Meta", "Con objetivo",
+                      FontAwesomeIcons.flagCheckered, SavingType.goal, colors),
                 ),
                 const Gap(10),
                 Expanded(
-                  child: _buildTypeSelector(
-                    "Fondo", "Indefinido", FontAwesomeIcons.infinity, SavingType.fund, colors
-                  ),
+                  child: _buildTypeSelector("Fondo", "Indefinido",
+                      FontAwesomeIcons.infinity, SavingType.fund, colors),
                 ),
               ],
             ),
@@ -106,23 +113,31 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
                   labelText: "Monto Objetivo",
                   prefixIcon: const Icon(Icons.track_changes),
                   prefixText: "\$ ",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
               const Gap(15),
             ],
 
             const Divider(),
-            const Text("Método de Ahorro Mensual", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Método de Ahorro Mensual",
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const Gap(10),
 
             // MÉTODO (Fijo vs Porcentaje)
             DropdownButtonFormField<SavingMethod>(
-              value: _selectedMethod,
-              decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              initialValue: _selectedMethod,
+              decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12))),
               items: const [
-                DropdownMenuItem(value: SavingMethod.fixed, child: Text("Monto Fijo Mensual")),
-                DropdownMenuItem(value: SavingMethod.percentage, child: Text("Porcentaje del Remanente")),
+                DropdownMenuItem(
+                    value: SavingMethod.fixed,
+                    child: Text("Monto Fijo Mensual")),
+                DropdownMenuItem(
+                    value: SavingMethod.percentage,
+                    child: Text("Porcentaje del Remanente")),
               ],
               onChanged: (val) => setState(() => _selectedMethod = val!),
             ),
@@ -132,12 +147,17 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
               controller: _valueController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: _selectedMethod == SavingMethod.fixed ? "Monto a Ahorrar" : "Porcentaje a Ahorrar",
-                prefixText: _selectedMethod == SavingMethod.fixed ? "\$ " : "% ",
-                suffixText: _selectedMethod == SavingMethod.percentage ? "%" : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                helperText: _selectedMethod == SavingMethod.percentage 
-                    ? "Se calculará sobre (Ingresos - Gastos) proyectados." 
+                labelText: _selectedMethod == SavingMethod.fixed
+                    ? "Monto a Ahorrar"
+                    : "Porcentaje a Ahorrar",
+                prefixText:
+                    _selectedMethod == SavingMethod.fixed ? "\$ " : "% ",
+                suffixText:
+                    _selectedMethod == SavingMethod.percentage ? "%" : null,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                helperText: _selectedMethod == SavingMethod.percentage
+                    ? "Se calculará sobre (Ingresos - Gastos) proyectados."
                     : null,
               ),
             ),
@@ -146,10 +166,11 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
             ElevatedButton(
               onPressed: _isFormValid ? _save : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C5CE7), // Púrpura
+                backgroundColor: const Color(0xFF9B59B6), // Púrpura
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text("CREAR AHORRO"),
             ),
@@ -159,7 +180,8 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
     );
   }
 
-  Widget _buildTypeSelector(String title, String sub, IconData icon, SavingType type, ColorScheme colors) {
+  Widget _buildTypeSelector(String title, String sub, IconData icon,
+      SavingType type, ColorScheme colors) {
     final isSelected = _selectedType == type;
     return GestureDetector(
       onTap: () {
@@ -169,15 +191,25 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C5CE7).withAlpha(30) : colors.surfaceContainer,
-          border: Border.all(color: isSelected ? const Color(0xFF6C5CE7) : Colors.transparent, width: 2),
+          color: isSelected
+              ? const Color(0xFF9B59B6).withAlpha(30)
+              : colors.surfaceContainer,
+          border: Border.all(
+              color: isSelected ? const Color(0xFF9B59B6) : Colors.transparent,
+              width: 2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? const Color(0xFF6C5CE7) : colors.outline),
+            Icon(icon,
+                color: isSelected ? const Color(0xFF9B59B6) : colors.outline),
             const Gap(5),
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? const Color(0xFF6C5CE7) : colors.onSurface)),
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected
+                        ? const Color(0xFF9B59B6)
+                        : colors.onSurface)),
             Text(sub, style: TextStyle(fontSize: 10, color: colors.outline)),
           ],
         ),
@@ -187,7 +219,9 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
 
   void _save() async {
     if (_nameController.text.isEmpty) return;
-    if (_selectedType == SavingType.goal && _targetController.text.isEmpty) return;
+    if (_selectedType == SavingType.goal && _targetController.text.isEmpty) {
+      return;
+    }
     if (_valueController.text.isEmpty) return;
 
     final dao = ref.read(savingsDaoProvider);
@@ -196,7 +230,9 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
     final newSaving = Saving()
       ..name = _nameController.text
       ..type = _selectedType
-      ..targetAmount = _selectedType == SavingType.goal ? double.tryParse(_targetController.text) : null
+      ..targetAmount = _selectedType == SavingType.goal
+          ? double.tryParse(_targetController.text)
+          : null
       ..method = _selectedMethod
       ..fixedAmount = _selectedMethod == SavingMethod.fixed ? val : null
       ..percentage = _selectedMethod == SavingMethod.percentage ? val : null

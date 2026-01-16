@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:finapp/ui/widgets/month_year_picker.dart';
+import 'package:finapp/data/models/recurring_movement.dart'; // Import added for RecurringMovement
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -12,7 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/expense.dart';
 import '../../data/models/debt.dart';
-import '../../data/models/recurring_movement.dart';
+// (Duplicate import removed - already imported on line 4)
 import '../../data/models/transaction.dart';
 import '../../date_utils.dart';
 import '../../logic/providers/database_providers.dart';
@@ -26,7 +28,8 @@ import '../shared/icon_mapper.dart';
 // --- PROVIDERS LOCALES PARA EL HOME ---
 
 // Estado de Pagos Fijos (Pagados vs Totales en el mes actual)
-final fixedPaymentsStatusProvider = StreamProvider<({int paid, int total})>((ref) async* {
+final fixedPaymentsStatusProvider =
+    StreamProvider<({int paid, int total})>((ref) async* {
   final expenseDao = ref.watch(expenseDaoProvider);
   final now = ref.watch(nowProvider);
   final range = getCycleDateRange(now, Frequency.monthly);
@@ -43,11 +46,15 @@ final fixedPaymentsStatusProvider = StreamProvider<({int paid, int total})>((ref
   // Cada vez que cambien las transacciones, recalculamos
   await for (final transactions in query.watch(fireImmediately: true)) {
     // Obtenemos la lista total de gastos fijos activos
-    final fixedExpenses = await isar.expenses.filter().isRecurringEqualTo(true).findAll();
+    final fixedExpenses =
+        await isar.expenses.filter().isRecurringEqualTo(true).findAll();
     final total = fixedExpenses.length;
 
     // Identificamos cuáles gastos fijos tienen al menos un pago registrado este mes
-    final paidIds = transactions.map((t) => t.relatedExpense.value?.id).whereType<int>().toSet();
+    final paidIds = transactions
+        .map((t) => t.relatedExpense.value?.id)
+        .whereType<int>()
+        .toSet();
     final paid = fixedExpenses.where((e) => paidIds.contains(e.id)).length;
 
     yield (paid: paid, total: total);
@@ -57,13 +64,16 @@ final fixedPaymentsStatusProvider = StreamProvider<({int paid, int total})>((ref
 // Balance de Ahorro Actual (Ingresos Ejecutados - Gastos Ejecutados)
 final currentSavingsProvider = Provider<AsyncValue<double>>((ref) {
   final incomeAsync = ref.watch(incomeExecutedTotalProvider);
-  final expenseAsync = ref.watch(executedTotalProvider); // Provider traído de expenses_screen.dart
+  final expenseAsync = ref
+      .watch(executedTotalProvider); // Provider traído de expenses_screen.dart
 
-  if (incomeAsync.isLoading || expenseAsync.isLoading) return const AsyncValue.loading();
-  
+  if (incomeAsync.isLoading || expenseAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+
   final income = incomeAsync.value ?? 0.0;
   final expense = expenseAsync.value ?? 0.0;
-  
+
   return AsyncValue.data(income - expense);
 });
 
@@ -73,25 +83,33 @@ final planningDateProvider = StateProvider<DateTime>((ref) {
 });
 
 // Transacciones Reales del Mes (Para cálculo de flujo de caja en planificación)
-final monthRealTransactionsProvider = StreamProvider<List<FinancialTransaction>>((ref) async* {
+final monthRealTransactionsProvider =
+    StreamProvider<List<FinancialTransaction>>((ref) async* {
   final expenseDao = ref.watch(expenseDaoProvider);
   // Usamos la fecha de planificación seleccionada en lugar de 'now'
   final planningDate = ref.watch(planningDateProvider);
   final range = getCycleDateRange(planningDate, Frequency.monthly);
-  
+
   // MODIFICADO: Ahora traemos TODAS las transacciones (Ingresos y Gastos) para calcular bien el flujo
   final isar = await expenseDao.isarService.db;
-  yield* isar.financialTransactions.filter().dateBetween(range.start, range.end).watch(fireImmediately: true);
+  yield* isar.financialTransactions
+      .filter()
+      .dateBetween(range.start, range.end)
+      .watch(fireImmediately: true);
 });
 
 // --- PROVIDERS PARA PLANIFICACIÓN ---
 
 // 1. Configuración de la Tabla (Columnas basadas en el Ingreso Principal)
-final planningConfigProvider = FutureProvider<({int columns, List<double> columnIncomes, Frequency freq})>((ref) async {
+final planningConfigProvider =
+    FutureProvider<({int columns, List<double> columnIncomes, Frequency freq})>(
+        (ref) async {
   final isar = await ref.watch(isarServiceProvider).db;
   final incomes = await isar.recurringMovements.where().findAll();
-  
-  if (incomes.isEmpty) return (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
+
+  if (incomes.isEmpty) {
+    return (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
+  }
 
   // Buscamos el ingreso que más dinero aporta al mes
   RecurringMovement? dominant;
@@ -105,20 +123,23 @@ final planningConfigProvider = FutureProvider<({int columns, List<double> column
     }
   }
 
-  if (dominant == null) return (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
+  if (dominant == null) {
+    return (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
+  }
 
   final freq = dominant.frequency;
   final amounts = dominant.paymentAmounts ?? [];
   int columns = 1;
   List<double> columnIncomes = [];
-  
+
   // Definimos columnas y distribuimos los montos exactos
   switch (freq) {
     case Frequency.weekly:
       columns = 4; // Asumimos mes estándar de 4 semanas para visualización
       // Si hay montos definidos, los usamos, si no, promediamos o repetimos
       if (amounts.isNotEmpty) {
-        columnIncomes = List.generate(4, (i) => i < amounts.length ? amounts[i] : amounts.last);
+        columnIncomes = List.generate(
+            4, (i) => i < amounts.length ? amounts[i] : amounts.last);
       } else {
         columnIncomes = List.filled(4, 0.0);
       }
@@ -165,7 +186,8 @@ class PlanningPositionsController extends StateNotifier<Map<String, int?>> {
         final jsonString = await file.readAsString();
         final Map<String, dynamic> decoded = jsonDecode(jsonString);
         // Convertimos dynamic a int?
-        final Map<String, int?> loaded = decoded.map((key, value) => MapEntry(key, value as int?));
+        final Map<String, int?> loaded =
+            decoded.map((key, value) => MapEntry(key, value as int?));
         state = loaded;
       }
     } catch (e) {
@@ -177,9 +199,9 @@ class PlanningPositionsController extends StateNotifier<Map<String, int?>> {
     try {
       final file = await _getFile();
       // Filtramos los nulos para guardar solo lo asignado
-      final toSave = Map<String, int>.fromEntries(
-        state.entries.where((e) => e.value != null).map((e) => MapEntry(e.key, e.value!))
-      );
+      final toSave = Map<String, int>.fromEntries(state.entries
+          .where((e) => e.value != null)
+          .map((e) => MapEntry(e.key, e.value!)));
       await file.writeAsString(jsonEncode(toSave));
     } catch (e) {
       debugPrint("Error guardando planificación: $e");
@@ -199,7 +221,9 @@ class PlanningPositionsController extends StateNotifier<Map<String, int?>> {
   }
 }
 
-final planningPositionsProvider = StateNotifierProvider<PlanningPositionsController, Map<String, int?>>((ref) {
+final planningPositionsProvider =
+    StateNotifierProvider<PlanningPositionsController, Map<String, int?>>(
+        (ref) {
   return PlanningPositionsController();
 });
 
@@ -220,9 +244,16 @@ final planningDebtsProvider = StreamProvider<List<Debt>>((ref) async* {
 
 enum SummaryFilter { currentPeriod, nextPeriod, currentMonth, nextMonth }
 
-final summaryFilterProvider = StateProvider<SummaryFilter>((ref) => SummaryFilter.currentPeriod);
+final summaryFilterProvider =
+    StateProvider<SummaryFilter>((ref) => SummaryFilter.currentPeriod);
 
-final homeSummaryDataProvider = FutureProvider<({double income, double expenses, double debts, double available})>((ref) async {
+final homeSummaryDataProvider = FutureProvider<
+    ({
+      double income,
+      double expenses,
+      double debts,
+      double available
+    })>((ref) async {
   final filter = ref.watch(summaryFilterProvider);
   final config = await ref.watch(planningConfigProvider.future);
   final expenses = await ref.watch(allFixedExpensesProvider.future);
@@ -230,11 +261,13 @@ final homeSummaryDataProvider = FutureProvider<({double income, double expenses,
   final positions = ref.watch(planningPositionsProvider);
   final now = ref.watch(nowProvider);
   final debtDao = ref.watch(debtDaoProvider);
+  final expenseDao = ref.watch(expenseDaoProvider);
 
-  // 1. Determinar índices de columnas (Periodos)
+// 1. Determinar índices de columnas (Periodos)
   int currentColumnIndex = 0;
   if (config.columns == 2) {
-    currentColumnIndex = now.day <= 15 ? 0 : 1;
+    // ✅ CORREGIDO: El día 15 pertenece al segundo periodo (índice 1), no al primero.
+    currentColumnIndex = now.day < 15 ? 0 : 1;
   } else if (config.columns == 4) {
     currentColumnIndex = ((now.day - 1) / 7).floor().clamp(0, 3);
   }
@@ -267,89 +300,245 @@ final homeSummaryDataProvider = FutureProvider<({double income, double expenses,
 
   // 3. Calcular Ingresos
   double income = 0.0;
-  if (isFullMonth) {
-    // Suma de todos los ingresos del mes (usamos la config de columnas como base)
-    income = config.columnIncomes.fold(0.0, (sum, val) => sum + val);
-  } else {
-    // Ingreso de la columna específica
-    income = (targetColumn != null && targetColumn < config.columnIncomes.length) 
-        ? config.columnIncomes[targetColumn] 
-        : 0.0;
+
+  // ✅ LÓGICA CORREGIDA: Identificar qué pago CUBRE este período
+  // - Columna 0 (días 1-15): Cubierto por el pago del ÚLTIMO del mes ANTERIOR
+  // - Columna 1 (días 16-último): Cubierto por el pago del día 15 del MISMO mes
+
+  final viewDate = isNextMonth ? DateTime(now.year, now.month + 1, 1) : now;
+  final isar = await expenseDao.isarService.db;
+
+  // Obtenemos los ingresos recurrentes definidos
+  final recurringIncomes = await isar.recurringMovements
+      .filter()
+      .typeEqualTo(TransactionType.income)
+      .findAll();
+
+  // Para vista de mes completo, necesitamos sumar todos los pagos del mes
+  // Para vista de período específico, solo el pago que cubre ese período
+
+  double calculatedIncome = 0.0;
+
+  for (var rec in recurringIncomes) {
+    final pDays = rec.paymentDays ?? [];
+    final pAmounts = rec.paymentAmounts ?? [];
+
+    if (rec.frequency == Frequency.biweekly && config.columns == 2) {
+      // ✅ LÓGICA QUINCENAL CORREGIDA
+      // pDays típicamente es [15, -1] (día 15 y último)
+      // pAmounts es [monto15, montoUltimo]
+
+      for (int i = 0; i < pDays.length; i++) {
+        int payDay = pDays[i];
+        double projectedAmount = (i < pAmounts.length) ? pAmounts[i] : 0.0;
+
+        // Determinar qué columna CUBRE este pago
+        // Pago del 15 (payDay == 15) → cubre columna 1 (16-último)
+        // Pago del último (payDay == -1 o >= 28) → cubre columna 0 (1-15) del SIGUIENTE ciclo
+        int coveredColumn;
+        DateTime paymentMonthDate; // El mes del que viene este pago
+
+        if (payDay == 15) {
+          // Pago del 15 cubre columna 1 del MISMO MES
+          coveredColumn = 1;
+          paymentMonthDate = viewDate;
+        } else {
+          // Pago del último (o >15) cubre columna 0 del MISMO MES
+          // Pero viene del pago del mes ANTERIOR
+          coveredColumn = 0;
+          // El pago que cubre columna 0 de viewDate.month viene del mes anterior
+          paymentMonthDate = DateTime(viewDate.year, viewDate.month - 1, 1);
+        }
+
+        // ¿Debemos incluir este pago en el cálculo?
+        bool shouldInclude = false;
+        if (isFullMonth) {
+          // En vista mensual, incluimos todo
+          shouldInclude = true;
+        } else if (targetColumn == coveredColumn) {
+          // En vista de período, solo si cubre el período objetivo
+          shouldInclude = true;
+        }
+
+        if (shouldInclude) {
+          // Calcular la fecha esperada del pago
+          final year = paymentMonthDate.year;
+          final month = paymentMonthDate.month;
+          final lastDayOfPaymentMonth = DateTime(year, month + 1, 0).day;
+
+          int realPayDay = payDay;
+          if (payDay == -1 || payDay > lastDayOfPaymentMonth) {
+            realPayDay = lastDayOfPaymentMonth;
+          }
+          DateTime expectedPaymentDate = DateTime(year, month, realPayDay);
+
+          // Buscar transacción confirmada para este pago específico
+          // Buscamos por parentRecurringId Y fecha esperada (con tolerancia de ±1 día)
+          final matchingTx = await isar.financialTransactions
+              .filter()
+              .typeEqualTo(TransactionType.income)
+              .parentRecurringIdEqualTo(rec.id)
+              .dateBetween(
+                expectedPaymentDate.subtract(const Duration(days: 1)),
+                expectedPaymentDate
+                    .add(const Duration(days: 1, hours: 23, minutes: 59)),
+              )
+              .findFirst();
+
+          if (matchingTx != null) {
+            // Hay transacción confirmada: usar monto real
+            calculatedIncome += matchingTx.amount;
+          } else {
+            // No hay transacción: usar proyectado
+            calculatedIncome += projectedAmount;
+          }
+        }
+      }
+    } else {
+      // LÓGICA PARA OTRAS FRECUENCIAS (mensual, semanal, etc.)
+      // Usamos la lógica original simplificada
+      final totalProjected = pAmounts.fold(0.0, (s, a) => s + a);
+
+      // Rango del mes para buscar transacciones
+      final monthStart = DateTime(viewDate.year, viewDate.month, 1);
+      final monthEnd =
+          DateTime(viewDate.year, viewDate.month + 1, 0, 23, 59, 59);
+
+      final matchingTxs = await isar.financialTransactions
+          .filter()
+          .typeEqualTo(TransactionType.income)
+          .parentRecurringIdEqualTo(rec.id)
+          .dateBetween(monthStart, monthEnd)
+          .findAll();
+
+      if (matchingTxs.isNotEmpty) {
+        // Usar montos reales
+        calculatedIncome += matchingTxs.fold(0.0, (s, t) => s + t.amount);
+      } else {
+        // Usar proyectado
+        calculatedIncome += totalProjected;
+      }
+    }
   }
+
+  // Ingresos EXTRA (No recurrentes) - solo dentro del período visualizado
+  DateTime periodStart, periodEnd;
+  if (isFullMonth) {
+    periodStart = DateTime(viewDate.year, viewDate.month, 1);
+    periodEnd = DateTime(viewDate.year, viewDate.month + 1, 0, 23, 59, 59);
+  } else if (config.columns == 2) {
+    if (targetColumn == 0) {
+      periodStart = DateTime(viewDate.year, viewDate.month, 1);
+      periodEnd = DateTime(viewDate.year, viewDate.month, 15, 23, 59, 59);
+    } else {
+      periodStart = DateTime(viewDate.year, viewDate.month, 16);
+      periodEnd = DateTime(viewDate.year, viewDate.month + 1, 0, 23, 59, 59);
+    }
+  } else {
+    periodStart = DateTime(viewDate.year, viewDate.month, 1);
+    periodEnd = DateTime(viewDate.year, viewDate.month + 1, 0, 23, 59, 59);
+  }
+
+  final extraIncomeTxs = await isar.financialTransactions
+      .filter()
+      .typeEqualTo(TransactionType.income)
+      .parentRecurringIdIsNull() // Solo ingresos extras (no recurrentes)
+      .dateBetween(periodStart, periodEnd)
+      .findAll();
+
+  calculatedIncome += extraIncomeTxs.fold(0.0, (s, t) => s + t.amount);
+
+  income = calculatedIncome;
 
   // 4. Calcular Gastos (Fijos y Deudas)
   double totalExpenses = 0.0;
   double totalDebts = 0.0;
-  
+
   // Helper para saber si una columna cuenta para el filtro actual
   bool isColumnIncluded(int? colIndex) {
-    if (isFullMonth) return true; // En vista mensual sumamos todo (o todo lo asignado)
+    if (isFullMonth) {
+      return true; // En vista mensual sumamos todo (o todo lo asignado)
+    }
     return colIndex == targetColumn;
   }
 
   // A. GASTOS FIJOS
-  // Si es vista de MES COMPLETO, sumamos el total proyectado de todos los gastos activos.
-  if (isFullMonth) {
-    totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
-  } else {
-    // Si es vista de PERIODO (Pago Actual/Siguiente), usamos la PLANIFICACIÓN (Posiciones)
-    // 1. Agrupamos gastos por categoría para replicar la lógica de bloques
-    final Map<int, ({double amount, Frequency freq})> categoryData = {};
-    for (var e in expenses) {
-       final cat = e.category.value;
-       if (cat == null) continue;
-       final current = categoryData[cat.id] ?? (amount: 0.0, freq: e.frequency);
-       categoryData[cat.id] = (amount: current.amount + e.amount, freq: current.freq);
-    }
+  // ✅ CORRECCIÓN: Solo contar bloques que están ASIGNADOS a alguna columna
+  // Bloques en el pool (sin posición) no cuentan ni para períodos ni para mes completo
+  for (var expense in expenses) {
+    // Determinar cuántos bloques genera este gasto según su frecuencia
+    int blocksCount = 1;
+    if (expense.frequency == Frequency.weekly) blocksCount = 4;
+    if (expense.frequency == Frequency.biweekly) blocksCount = 2;
 
-    // 2. Iteramos los bloques teóricos y sumamos solo si están asignados a la columna target
-    categoryData.forEach((catId, data) {
-        int blocksCount = 1;
-        if (data.freq == Frequency.weekly) blocksCount = 4;
-        if (data.freq == Frequency.biweekly) blocksCount = 2;
+    for (int i = 0; i < blocksCount; i++) {
+      // ✅ Usar el mismo formato de ID que _PlanningTab: "exp_${expenseId}_$i"
+      final blockId = "exp_${expense.id}_$i";
 
-        for (int i = 0; i < blocksCount; i++) {
-            final blockId = "cat_${catId}_$i";
-            // Verificamos si el usuario asignó este bloque a la columna que estamos viendo
-            if (positions[blockId] == targetColumn) {
-                totalExpenses += data.amount;
-            }
+      // ✅ Solo contar si el bloque tiene posición ASIGNADA
+      final assignedCol = positions[blockId];
+
+      if (assignedCol != null) {
+        // Para mes completo: contar si está asignado a CUALQUIER columna
+        // Para período: contar solo si está en la columna target
+        if (isFullMonth || isColumnIncluded(assignedCol)) {
+          totalExpenses += expense.amount;
         }
-    });
+      }
+    }
   }
 
   // B. DEUDAS
-  // Definimos el mes de referencia para generar los bloques de deuda
-  DateTime generationDate = isNextMonth ? DateTime(now.year, now.month + 1, 1) : now;
-  DateTime startOfMonth = DateTime(generationDate.year, generationDate.month, 1);
-  DateTime endOfMonth = DateTime(generationDate.year, generationDate.month + 1, 0, 23, 59, 59);
+  // ✅ CORRECCIÓN: Sincronizar con la lógica de _PlanningTab (incluye límite de cuotas)
+  DateTime generationDate =
+      isNextMonth ? DateTime(now.year, now.month + 1, 1) : now;
+  DateTime startOfMonth =
+      DateTime(generationDate.year, generationDate.month, 1);
+  DateTime endOfMonth =
+      DateTime(generationDate.year, generationDate.month + 1, 0, 23, 59, 59);
 
   for (var debt in allDebts) {
     DateTime? date = debt.nextPaymentDate;
-    if (date != null) {
-       // Avanzamos la fecha hasta llegar al mes de generación si es necesario
-       if (date.isBefore(startOfMonth)) {
-          while(date!.isBefore(startOfMonth)) {
-             date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
+
+    // ✅ Calcular cuotas restantes para evitar cuotas fantasma
+    int remainingInstallments = 999;
+    if (debt.installmentAmount > 0) {
+      remainingInstallments =
+          (debt.remainingAmount / debt.installmentAmount).ceil();
+    }
+
+    if (date != null && !debt.isPaidOff && remainingInstallments > 0) {
+      // Avanzamos la fecha hasta llegar al mes de generación si es necesario
+      while (date!.isBefore(startOfMonth) && remainingInstallments > 0) {
+        date = debtDao.calculateNextPaymentDate(
+            date, debt.frequency, debt.customDays);
+        remainingInstallments--; // ✅ Consumir cuotas al avanzar
+      }
+
+      // Iteramos todas las cuotas dentro del mes
+      while (
+          (date!.isBefore(endOfMonth) || date.isAtSameMomentAs(endOfMonth)) &&
+              remainingInstallments > 0) {
+        // Verificamos si el bloque de deuda está asignado a alguna columna
+        final blockId = "debt_${debt.id}_${date.day}";
+
+        // ✅ Solo contar si el bloque tiene posición ASIGNADA
+        final assignedCol = positions[blockId];
+
+        if (assignedCol != null) {
+          // Para mes completo: contar si está asignado a CUALQUIER columna
+          // Para período: contar solo si está en la columna target
+          if (isFullMonth || isColumnIncluded(assignedCol)) {
+            totalDebts += debt.installmentAmount;
           }
-       }
-       
-       // Iteramos todas las cuotas dentro del mes
-       while (date!.isBefore(endOfMonth) || date.isAtSameMomentAs(endOfMonth)) {
-         if (isFullMonth) {
-           // Si es mes completo, sumamos todo
-           totalDebts += debt.installmentAmount;
-         } else {
-           // Si es periodo, verificamos si el bloque de deuda está asignado a la columna target
-           final blockId = "debt_${debt.id}_${date.day}";
-           // Nota: Si el usuario no ha movido la deuda, positions[blockId] es null.
-           // Asumimos que para el resumen de "Pago Actual" solo cuenta lo explícitamente asignado o forzado.
-           if (positions[blockId] == targetColumn) {
-              totalDebts += debt.installmentAmount;
-           }
-         }
-         date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
-       }
+        }
+
+        remainingInstallments--;
+        if (remainingInstallments <= 0) break;
+
+        date = debtDao.calculateNextPaymentDate(
+            date, debt.frequency, debt.customDays);
+      }
     }
   }
 
@@ -370,7 +559,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
   @override
@@ -388,12 +578,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: AppBar(
         // Quitamos el título y reducimos la altura para ganar espacio
-        toolbarHeight: 0, 
+        toolbarHeight: 0,
         backgroundColor: colors.surface,
         elevation: 0,
         bottom: TabBar(
@@ -405,7 +595,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
             Tab(text: "Resumen", icon: Icon(Icons.dashboard_outlined)),
-            Tab(text: "Planificación", icon: Icon(Icons.calendar_month_outlined)),
+            Tab(
+                text: "Planificación",
+                icon: Icon(Icons.calendar_month_outlined)),
           ],
         ),
       ),
@@ -430,8 +622,8 @@ class _SummaryTab extends ConsumerWidget {
     // Observamos el filtro para cambiar la Key del gráfico y forzar su animación de entrada
     final filter = ref.watch(summaryFilterProvider);
     return SingleChildScrollView(
-      physics: BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(20, 10, 20, 20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
       child: Column(
         children: [
           const Gap(10),
@@ -465,7 +657,9 @@ class _SummaryFilterSelector extends ConsumerWidget {
             color: isSelected ? colors.primary : colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? colors.primary : colors.outlineVariant.withAlpha(100),
+              color: isSelected
+                  ? colors.primary
+                  : colors.outlineVariant.withAlpha(100),
             ),
           ),
           child: Text(
@@ -511,20 +705,36 @@ class _PlanningTab extends ConsumerWidget {
     final positions = ref.watch(planningPositionsProvider);
     final realTransactionsAsync = ref.watch(monthRealTransactionsProvider);
 
-    if (configAsync.isLoading || expensesAsync.isLoading || debtsAsync.isLoading || realTransactionsAsync.isLoading) {
+    if (configAsync.isLoading ||
+        expensesAsync.isLoading ||
+        debtsAsync.isLoading ||
+        realTransactionsAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final config = configAsync.value ?? (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
+    final config = configAsync.value ??
+        (columns: 1, columnIncomes: [0.0], freq: Frequency.monthly);
     final expenses = expensesAsync.value ?? [];
     final debts = debtsAsync.value ?? [];
     final realTransactions = realTransactionsAsync.value ?? [];
-    
+
     // Fecha base para la planificación
     final planningDate = ref.watch(planningDateProvider);
 
-    // 1. Agrupamos gastos por Categoría y calculamos contadores (Pagados vs Total)
-    final Map<int, ({String name, int icon, int color, double amount, Frequency frequency, int totalCount, int paidCount})> groupedExpenses = {};
+    // 1. Agrupamos gastos por GASTO INDIVIDUAL para respetar frecuencias individuales
+    final Map<
+        int,
+        ({
+          String name,
+          String paymentName,
+          int icon,
+          int color,
+          double amount,
+          Frequency frequency,
+          int totalCount,
+          int paidCount,
+          int catId
+        })> groupedExpenses = {};
 
     // Identificamos qué gastos (IDs) ya tienen pago este mes
     final paidExpenseIds = realTransactions
@@ -535,48 +745,55 @@ class _PlanningTab extends ConsumerWidget {
     for (var e in expenses) {
       final cat = e.category.value;
       if (cat == null) continue;
-      
+
       final isPaid = paidExpenseIds.contains(e.id);
 
-      final current = groupedExpenses[cat.id] ?? (
-        name: cat.name, 
-        icon: cat.iconCode, 
-        color: cat.colorValue, 
-        amount: 0.0, 
-        frequency: e.frequency,
-        totalCount: 0,
-        paidCount: 0
-      );
-
-      groupedExpenses[cat.id] = (
-        name: current.name,
-        icon: current.icon,
-        color: current.color,
-        amount: current.amount + e.amount,
-        frequency: current.frequency,
-        totalCount: current.totalCount + 1,
-        paidCount: current.paidCount + (isPaid ? 1 : 0)
+      // Usamos el ID del GASTO como clave en lugar del ID de la categoría
+      groupedExpenses[e.id] = (
+        name: cat.name,
+        paymentName: e.title, // Nombre del pago individual
+        icon: cat.iconCode,
+        color: cat.colorValue,
+        amount: e.amount,
+        frequency: e.frequency, // Aquí respetamos la frecuencia individual
+        totalCount: 1,
+        paidCount: isPaid ? 1 : 0,
+        catId: cat.id
       );
     }
 
     // 2. Generamos los bloques visuales
-    // Estructura extendida para soportar bloqueo y estado
-    final List<({String id, String name, int icon, int color, double amount, String? subtitle, bool isLocked, int? paidCount, int? totalCount})> blocks = [];
-    
-    groupedExpenses.forEach((catId, data) {
+    final List<
+        ({
+          String id,
+          String name,
+          String? paymentName,
+          int icon,
+          int color,
+          double amount,
+          String? subtitle,
+          bool isLocked,
+          int? paidCount,
+          int? totalCount
+        })> blocks = [];
+
+    groupedExpenses.forEach((expenseId, data) {
       int blocksCount = 1;
       if (data.frequency == Frequency.weekly) blocksCount = 4;
       if (data.frequency == Frequency.biweekly) blocksCount = 2;
-      
+
       for (int i = 0; i < blocksCount; i++) {
+        // ID único compuesto por Gasto + Indice.
+        // Usamos "exp_" para diferenciar de categorías agrupadas anteriores
         blocks.add((
-          id: "cat_${catId}_$i", 
+          id: "exp_${expenseId}_$i",
           name: data.name,
+          paymentName: data.paymentName, // Nombre del pago individual
           icon: data.icon,
           color: data.color,
           amount: data.amount,
-          subtitle: null,
-          isLocked: false, // Por defecto desbloqueado
+          subtitle: blocksCount > 1 ? "Parte ${i + 1}" : null,
+          isLocked: false,
           paidCount: data.paidCount,
           totalCount: data.totalCount,
         ));
@@ -586,42 +803,69 @@ class _PlanningTab extends ConsumerWidget {
     // 3. Agregamos las DEUDAS como bloques
     // LÓGICA MEJORADA: Generar un bloque por CADA cuota dentro del mes actual
     final startOfMonth = DateTime(planningDate.year, planningDate.month, 1);
-    final endOfMonth = DateTime(planningDate.year, planningDate.month + 1, 0, 23, 59, 59);
-    final debtDao = ref.watch(debtDaoProvider); // Necesitamos el DAO para calcular fechas
+    final endOfMonth =
+        DateTime(planningDate.year, planningDate.month + 1, 0, 23, 59, 59);
+    final debtDao =
+        ref.watch(debtDaoProvider); // Necesitamos el DAO para calcular fechas
 
     for (var debt in debts) {
-      // Usamos la fecha de próximo pago como ancla.
       DateTime? anchorDate = debt.nextPaymentDate;
-      
-      // 1. Generamos bloques futuros desde anchorDate
-      if (anchorDate != null) {
+
+      // ✅ LÓGICA DE CUOTAS RESTANTES: Evitar proyectar más cuotas de las que faltan.
+      int remainingInstallments = 999;
+      if (debt.installmentAmount > 0) {
+        remainingInstallments =
+            (debt.remainingAmount / debt.installmentAmount).ceil();
+      }
+
+      if (anchorDate != null && !debt.isPaidOff && remainingInstallments > 0) {
         DateTime date = anchorDate;
+
+        // Loop de proyección
         while (date.isBefore(endOfMonth) || date.isAtSameMomentAs(endOfMonth)) {
-          // ID estable basado en el día: debt_ID_DIA
-          // Solo agregamos si cae dentro del mes seleccionado (para evitar duplicados de meses anteriores si el loop empieza antes)
+          // Si el date se sale del mes (futuro), el while parará.
+
           if (date.isAfter(startOfMonth.subtract(const Duration(seconds: 1)))) {
+            // Está DENTRO del mes. Agregamos bloque.
             final blockId = "debt_${debt.id}_${date.day}";
-            
             blocks.add((
               id: blockId,
               name: debt.title,
+              paymentName: null, // Deudas no tienen paymentName separado
               icon: FontAwesomeIcons.fileInvoiceDollar.codePoint,
-              color: const Color(0xFFE17055).value, // Terracota para Deudas
+              color:
+                  const Color(0xFFD35400).toARGB32(), // Terracota para Deudas
               amount: debt.installmentAmount,
               subtitle: "Vence: ${DateFormat('d MMM', 'es').format(date)}",
               isLocked: false,
               paidCount: null,
               totalCount: null,
             ));
+
+            // Consumimos una cuota proyectada
+            remainingInstallments--;
+            if (remainingInstallments <= 0) {
+              break; // Ya no mostramos más si se acabó la deuda
+            }
+          } else {
+            // ✅ CORRECCIÓN: La fecha es ANTERIOR al mes visualizado.
+            // Aunque no mostramos bloque, DEBEMOS consumir una cuota proyectada
+            // porque esa cuota "ya pasó" en un mes anterior.
+            remainingInstallments--;
+            if (remainingInstallments <= 0) {
+              break; // Ya no hay cuotas restantes para proyectar
+            }
           }
-          date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
+
+          date = debtDao.calculateNextPaymentDate(
+              date, debt.frequency, debt.customDays);
         }
       }
     }
 
     // 4. LÓGICA DE BLOQUEO Y MOVIMIENTO AUTOMÁTICO (REAL WORLD OVERRIDE)
     // Iteramos las transacciones reales para "forzar" la posición de los bloques y bloquearlos.
-    
+
     // Mapa temporal para saber qué posiciones forzar visualmente
     final Map<String, int> forcedPositions = {};
     // Conjunto de IDs bloqueados
@@ -646,22 +890,25 @@ class _PlanningTab extends ConsumerWidget {
         final debt = tx.relatedDebt.value!;
         final colIndex = getColumnForDate(tx.date);
         final debtPrefix = "debt_${debt.id}_";
-        
+
         // ✅ LÓGICA INTELIGENTE:
         // 1. Buscamos si existe un bloque exacto para ese día (pago puntual).
-        int existingIndex = blocks.indexWhere((b) => b.id == "debt_${debt.id}_${tx.date.day}");
-        
+        int existingIndex =
+            blocks.indexWhere((b) => b.id == "debt_${debt.id}_${tx.date.day}");
+
         // 2. Si no, buscamos CUALQUIER bloque de esta deuda que no esté bloqueado todavía.
         // Esto evita duplicados: si pagaste el 14 lo del 15, tomamos el bloque del 15 y lo actualizamos.
         if (existingIndex == -1) {
-          existingIndex = blocks.indexWhere((b) => b.id.startsWith(debtPrefix) && !b.isLocked);
+          existingIndex = blocks
+              .indexWhere((b) => b.id.startsWith(debtPrefix) && !b.isLocked);
         }
-        
+
         if (existingIndex != -1) {
           // Si existe, lo actualizamos
           blocks[existingIndex] = (
             id: blocks[existingIndex].id,
             name: blocks[existingIndex].name,
+            paymentName: blocks[existingIndex].paymentName,
             icon: blocks[existingIndex].icon,
             color: blocks[existingIndex].color,
             amount: blocks[existingIndex].amount,
@@ -676,8 +923,9 @@ class _PlanningTab extends ConsumerWidget {
           blocks.add((
             id: blockId,
             name: debt.title,
+            paymentName: null, // Deudas no tienen paymentName separado
             icon: FontAwesomeIcons.fileInvoiceDollar.codePoint,
-            color: const Color(0xFFE17055).value, // Terracota
+            color: const Color(0xFFD35400).toARGB32(), // Terracota
             amount: tx.amount, // Usamos el monto real pagado
             subtitle: "Pagado el ${tx.date.day}",
             isLocked: true, // BLOQUEADO
@@ -687,43 +935,43 @@ class _PlanningTab extends ConsumerWidget {
           forcedPositions[blockId] = colIndex;
           lockedIds.add(blockId);
         }
-        
+
         if (existingIndex != -1) {
-           forcedPositions[blocks[existingIndex].id] = colIndex;
-           lockedIds.add(blocks[existingIndex].id);
+          forcedPositions[blocks[existingIndex].id] = colIndex;
+          lockedIds.add(blocks[existingIndex].id);
         }
       }
-      
-      // CASO CATEGORÍA PAGADA
-      // Si hay un pago de categoría, buscamos un bloque disponible de esa categoría y lo movemos/bloqueamos.
+
+      // CASO GASTO RECURRENTE PAGADO (Antes Categoría Pagada)
+      // Ahora se busca por ID de Gasto directamente, no por categoría.
       else if (tx.isRecurring && tx.relatedExpense.value != null) {
-        final cat = tx.relatedExpense.value!.category.value;
-        if (cat != null) {
-          final colIndex = getColumnForDate(tx.date);
-          final catPrefix = "cat_${cat.id}_";
-          
-          // Buscamos el primer bloque de esta categoría que NO esté ya bloqueado
-          // Esto distribuye los pagos entre los bloques disponibles (ej: 4 semanas)
-          final blockIndex = blocks.indexWhere((b) => b.id.startsWith(catPrefix) && !lockedIds.contains(b.id));
-          
-          if (blockIndex != -1) {
-            final block = blocks[blockIndex];
-            // Lo marcamos como bloqueado
-            blocks[blockIndex] = (
-              id: block.id,
-              name: block.name,
-              icon: block.icon,
-              color: block.color,
-              amount: block.amount,
-              subtitle: "Pago realizado",
-              isLocked: true,
-              paidCount: block.paidCount,
-              totalCount: block.totalCount,
-            );
-            
-            forcedPositions[block.id] = colIndex;
-            lockedIds.add(block.id);
-          }
+        final expense = tx.relatedExpense.value!;
+        // ✅ CORREGIDO: Usamos el ID del gasto
+        final colIndex = getColumnForDate(tx.date);
+        final expPrefix = "exp_${expense.id}_";
+
+        // Buscamos el primer bloque de este gasto que NO esté ya bloqueado
+        final blockIndex = blocks.indexWhere(
+            (b) => b.id.startsWith(expPrefix) && !lockedIds.contains(b.id));
+
+        if (blockIndex != -1) {
+          final block = blocks[blockIndex];
+          // Lo marcamos como bloqueado y asignado
+          blocks[blockIndex] = (
+            id: block.id,
+            name: block.name,
+            paymentName: block.paymentName,
+            icon: block.icon,
+            color: block.color,
+            amount: block.amount,
+            subtitle: "Pago realizado",
+            isLocked: true,
+            paidCount: block.paidCount,
+            totalCount: block.totalCount,
+          );
+
+          forcedPositions[block.id] = colIndex;
+          lockedIds.add(block.id);
         }
       }
     }
@@ -731,7 +979,9 @@ class _PlanningTab extends ConsumerWidget {
     // Separamos bloques asignados de los no asignados (Pool)
     // Un bloque está en el pool si: NO tiene posición guardada Y NO tiene posición forzada.
     final unassignedBlocks = blocks.where((b) {
-      if (forcedPositions.containsKey(b.id)) return false; // Si está forzado, no está en pool
+      if (forcedPositions.containsKey(b.id)) {
+        return false; // Si está forzado, no está en pool
+      }
       return positions[b.id] == null;
     }).toList();
 
@@ -757,26 +1007,78 @@ class _PlanningTab extends ConsumerWidget {
                     return positions[b.id] == colIndex;
                   }).toList();
 
-                  // Obtenemos el ingreso específico de esta columna
-                  final colIncome = config.columnIncomes.length > colIndex ? config.columnIncomes[colIndex] : 0.0;
-                  
+                  // ✅ CORRECCIÓN: Calcular ingreso REAL para esta columna
+                  // Si hay transacción confirmada del pago que cubre esta columna, usar monto real.
+                  // Si no, usar proyectado.
+                  double colIncome = config.columnIncomes.length > colIndex
+                      ? config.columnIncomes[colIndex]
+                      : 0.0;
+
+                  if (config.columns == 2) {
+                    // Lógica quincenal: identificar qué pago cubre esta columna
+                    // Columna 0 (1-15) ← pago del último del mes anterior
+                    // Columna 1 (16-último) ← pago del día 15 del mismo mes
+
+                    final year = planningDate.year;
+                    final month = planningDate.month;
+
+                    DateTime? expectedPaymentDate;
+                    if (colIndex == 1) {
+                      // Columna 1: cubierta por pago del 15 del mismo mes
+                      expectedPaymentDate = DateTime(year, month, 15);
+                    } else {
+                      // Columna 0: cubierta por pago del último del mes anterior
+                      final prevMonth = month == 1 ? 12 : month - 1;
+                      final prevYear = month == 1 ? year - 1 : year;
+                      final lastDayPrevMonth =
+                          DateTime(prevYear, prevMonth + 1, 0).day;
+                      expectedPaymentDate =
+                          DateTime(prevYear, prevMonth, lastDayPrevMonth);
+                    }
+
+                    // Buscar transacción de ingreso recurrente con fecha cercana a expectedPaymentDate
+                    final matchingIncomeTx = realTransactions
+                        .where((tx) =>
+                                tx.type == TransactionType.income &&
+                                tx.isRecurring &&
+                                tx.parentRecurringId != null &&
+                                tx.date.year == expectedPaymentDate!.year &&
+                                tx.date.month == expectedPaymentDate.month &&
+                                (tx.date.day - expectedPaymentDate.day).abs() <=
+                                    2 // Tolerancia de ±2 días
+                            )
+                        .toList();
+
+                    if (matchingIncomeTx.isNotEmpty) {
+                      // Usar monto real de la transacción
+                      colIncome = matchingIncomeTx.fold(
+                          0.0, (sum, tx) => sum + tx.amount);
+                    }
+                    // Si no hay transacción, colIncome mantiene el valor proyectado
+                  }
+
                   // Calculamos totales
-                  final totalExpenses = columnBlocks.fold(0.0, (sum, b) => sum + b.amount);
+                  final totalExpenses =
+                      columnBlocks.fold(0.0, (sum, b) => sum + b.amount);
                   final remaining = colIncome - totalExpenses;
 
                   return Expanded(
                     child: _PlanningColumn(
                       index: colIndex,
-                      planningDate: planningDate, // Pasamos la fecha seleccionada
+                      planningDate:
+                          planningDate, // Pasamos la fecha seleccionada
                       totalColumns: config.columns,
                       income: colIncome,
                       totalExpenses: totalExpenses,
                       remaining: remaining,
                       blocks: columnBlocks,
-                      allRealTransactions: realTransactions, // Pasamos las transacciones reales
+                      allRealTransactions:
+                          realTransactions, // Pasamos las transacciones reales
                       onDrop: (blockId) {
                         // Actualizamos el estado local: Asignar a columna
-                        ref.read(planningPositionsProvider.notifier).updatePosition(blockId, colIndex);
+                        ref
+                            .read(planningPositionsProvider.notifier)
+                            .updatePosition(blockId, colIndex);
                       },
                     ),
                   );
@@ -789,62 +1091,111 @@ class _PlanningTab extends ConsumerWidget {
         // --- ÁREA DE POOL (GASTOS POR ASIGNAR) ---
         // Movido abajo y con más altura para evitar overflow
         DragTarget<String>(
-          onWillAcceptWithDetails: (_) => true,
-          onAcceptWithDetails: (details) {
-            // Al soltar aquí, devolvemos el gasto al pool (posición null)
-            ref.read(planningPositionsProvider.notifier).updatePosition(details.data, null);
-          },
-          builder: (context, candidateData, rejectedData) {
-            final isHovered = candidateData.isNotEmpty;
-            return Container(
-              height: 180, 
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isHovered ? colors.primaryContainer.withAlpha(50) : colors.surfaceContainerHighest.withAlpha(100),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isHovered ? colors.primary : colors.outlineVariant.withAlpha(100)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Gastos por Asignar (${unassignedBlocks.length})",
-                    style: TextStyle(fontSize: 12, color: colors.outline, fontWeight: FontWeight.bold),
-                  ),
-                  const Gap(8),
-                  Expanded(
-                    child: unassignedBlocks.isEmpty 
-                    ? Center(child: Text("¡Todo planificado!", style: TextStyle(fontSize: 12, color: colors.primary)))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Wrap(
-                          direction: Axis.vertical,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: unassignedBlocks.map((b) {
-                            return Draggable<String>(
-                              data: b.id,
-                              // Si está bloqueado, deshabilitamos el arrastre (maxSimultaneousDrags: 0)
-                              maxSimultaneousDrags: b.isLocked ? 0 : 1,
-                              feedback: Material(
-                                color: Colors.transparent,
-                                child: Opacity(opacity: 0.9, child: _ExpenseBlock(id: b.id, name: b.name, icon: b.icon, color: b.color, amount: b.amount, subtitle: b.subtitle, isLocked: b.isLocked, paidCount: b.paidCount, totalCount: b.totalCount, isCompact: true)),
+            onWillAcceptWithDetails: (_) => true,
+            onAcceptWithDetails: (details) {
+              // Al soltar aquí, devolvemos el gasto al pool (posición null)
+              ref
+                  .read(planningPositionsProvider.notifier)
+                  .updatePosition(details.data, null);
+            },
+            builder: (context, candidateData, rejectedData) {
+              final isHovered = candidateData.isNotEmpty;
+              return Container(
+                height: 180,
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isHovered
+                      ? colors.primaryContainer.withAlpha(50)
+                      : colors.surfaceContainerHighest.withAlpha(100),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: isHovered
+                          ? colors.primary
+                          : colors.outlineVariant.withAlpha(100)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Gastos por Asignar (${unassignedBlocks.length})",
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: colors.outline,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: unassignedBlocks.isEmpty
+                          ? Center(
+                              child: Text("¡Todo planificado!",
+                                  style: TextStyle(
+                                      fontSize: 12, color: colors.primary)))
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Wrap(
+                                direction: Axis.vertical,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: unassignedBlocks.map((b) {
+                                  return Draggable<String>(
+                                    data: b.id,
+                                    // Si está bloqueado, deshabilitamos el arrastre (maxSimultaneousDrags: 0)
+                                    maxSimultaneousDrags: b.isLocked ? 0 : 1,
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: Opacity(
+                                          opacity: 0.9,
+                                          child: _ExpenseBlock(
+                                              id: b.id,
+                                              name: b.name,
+                                              paymentName: b.paymentName,
+                                              icon: b.icon,
+                                              color: b.color,
+                                              amount: b.amount,
+                                              subtitle: b.subtitle,
+                                              isLocked: b.isLocked,
+                                              paidCount: b.paidCount,
+                                              totalCount: b.totalCount,
+                                              isCompact: true)),
+                                    ),
+                                    childWhenDragging: Opacity(
+                                        opacity: 0.3,
+                                        child: _ExpenseBlock(
+                                            id: b.id,
+                                            name: b.name,
+                                            paymentName: b.paymentName,
+                                            icon: b.icon,
+                                            color: b.color,
+                                            amount: b.amount,
+                                            subtitle: b.subtitle,
+                                            isLocked: b.isLocked,
+                                            paidCount: b.paidCount,
+                                            totalCount: b.totalCount,
+                                            isCompact: true)),
+                                    child: _ExpenseBlock(
+                                        id: b.id,
+                                        name: b.name,
+                                        paymentName: b.paymentName,
+                                        icon: b.icon,
+                                        color: b.color,
+                                        amount: b.amount,
+                                        subtitle: b.subtitle,
+                                        isLocked: b.isLocked,
+                                        paidCount: b.paidCount,
+                                        totalCount: b.totalCount,
+                                        isCompact: true),
+                                  );
+                                }).toList(),
                               ),
-                              childWhenDragging: Opacity(opacity: 0.3, child: _ExpenseBlock(id: b.id, name: b.name, icon: b.icon, color: b.color, amount: b.amount, subtitle: b.subtitle, isLocked: b.isLocked, paidCount: b.paidCount, totalCount: b.totalCount, isCompact: true)),
-                              child: _ExpenseBlock(id: b.id, name: b.name, icon: b.icon, color: b.color, amount: b.amount, subtitle: b.subtitle, isLocked: b.isLocked, paidCount: b.paidCount, totalCount: b.totalCount, isCompact: true),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                  ),
-                ],
-              ),
-            );
-          }
-        ),
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            }),
       ],
     );
   }
@@ -858,7 +1209,8 @@ class _PlanningColumn extends StatelessWidget {
   final double totalExpenses;
   final double remaining;
   final List<dynamic> blocks; // Lista de bloques en esta columna
-  final List<FinancialTransaction> allRealTransactions; // Todas las transacciones del mes
+  final List<FinancialTransaction>
+      allRealTransactions; // Todas las transacciones del mes
   final Function(String) onDrop;
 
   const _PlanningColumn({
@@ -894,7 +1246,8 @@ class _PlanningColumn extends StatelessWidget {
         colEnd = DateTime(baseDate.year, baseDate.month, 15, 23, 59, 59);
       } else {
         title = "Pago Quincena";
-        dateRange = "Cubre: 16 - ${DateTime(baseDate.year, baseDate.month + 1, 0).day} ${DateFormat('MMM', 'es').format(baseDate)}";
+        dateRange =
+            "Cubre: 16 - ${DateTime(baseDate.year, baseDate.month + 1, 0).day} ${DateFormat('MMM', 'es').format(baseDate)}";
         colStart = DateTime(baseDate.year, baseDate.month, 16);
         colEnd = DateTime(baseDate.year, baseDate.month + 1, 0, 23, 59, 59);
       }
@@ -902,7 +1255,8 @@ class _PlanningColumn extends StatelessWidget {
       title = "Semana ${index + 1}";
       dateRange = ""; // Simplificado para semanal
       // Cálculo aproximado de semanas
-      colStart = DateTime(baseDate.year, baseDate.month, 1).add(Duration(days: index * 7));
+      colStart = DateTime(baseDate.year, baseDate.month, 1)
+          .add(Duration(days: index * 7));
       colEnd = colStart.add(const Duration(days: 6, hours: 23, minutes: 59));
     } else {
       title = "Mes Completo";
@@ -912,16 +1266,19 @@ class _PlanningColumn extends StatelessWidget {
     }
 
     // --- CÁLCULO DEL DISPONIBLE REAL (JACKPOT) ---
-    
+
     // 1. Filtramos transacciones reales que ocurrieron en el rango de esta columna
-    final colTransactions = allRealTransactions.where((t) => 
-      t.date.isAfter(colStart.subtract(const Duration(seconds: 1))) && 
-      t.date.isBefore(colEnd.add(const Duration(seconds: 1)))
-    ).toList();
+    final colTransactions = allRealTransactions
+        .where((t) =>
+            t.date.isAfter(colStart.subtract(const Duration(seconds: 1))) &&
+            t.date.isBefore(colEnd.add(const Duration(seconds: 1))))
+        .toList();
 
     // 2. Sumamos todo lo gastado realmente en este periodo (Solo Gastos)
     final realTotalSpent = colTransactions
-        .where((t) => t.type == TransactionType.expense || t.type == TransactionType.saving) // Incluimos Ahorros
+        .where((t) =>
+            t.type == TransactionType.expense ||
+            t.type == TransactionType.saving) // Incluimos Ahorros
         .fold(0.0, (sum, t) => sum + t.amount);
 
     // 2.1 Sumamos los INGRESOS EXTRAS reales en este periodo (Corrección solicitada)
@@ -933,7 +1290,7 @@ class _PlanningColumn extends StatelessWidget {
     // 3. Calculamos cuánto de lo "Planificado" ya se pagó para no restarlo dos veces.
     //    (Si planifiqué 50 y pagué 45, resto 45 real y 5 remanente planificado = 50 total).
     //    (Si planifiqué 50 y pagué 50, resto 50 real y 0 remanente).
-    
+
     double matchedProjectedAmount = 0.0;
 
     // Mapa temporal para controlar qué bloques fijos ya se "cubrieron" con transacciones
@@ -951,7 +1308,8 @@ class _PlanningColumn extends StatelessWidget {
         final parts = b.id.toString().split('_');
         if (parts.length >= 2) {
           final catId = int.tryParse(parts[1]) ?? -1;
-          categoryBlockPool[catId] = (categoryBlockPool[catId] ?? 0.0) + b.amount;
+          categoryBlockPool[catId] =
+              (categoryBlockPool[catId] ?? 0.0) + b.amount;
         }
       }
       // También nos interesan los bloques de deuda (debt_...)
@@ -977,9 +1335,9 @@ class _PlanningColumn extends StatelessWidget {
           double match = tx.amount;
           // No podemos matchear más de lo planificado
           if (match > planned) match = planned;
-          
+
           matchedProjectedAmount += match;
-          
+
           // Reducimos el pool disponible de esa deuda
           debtBlockPool[debtId] = planned - match;
         }
@@ -987,33 +1345,33 @@ class _PlanningColumn extends StatelessWidget {
       // CASO GASTO FIJO: Si es un gasto fijo (recurrente) y no es deuda
       else if (tx.isRecurring) {
         // Intentamos encontrar un bloque de categoría que coincida
-        // Nota: FinancialTransaction no guarda catId directo fácilmente accesible sin cargar, 
+        // Nota: FinancialTransaction no guarda catId directo fácilmente accesible sin cargar,
         // pero relatedExpense -> category -> id sí. Asumimos que la lógica de negocio mantiene consistencia.
         // Para simplificar y ser robustos, usamos el matching visual si es posible, o asumimos que
         // si hay un gasto recurrente real, "consume" presupuesto planificado.
-        
+
         // Estrategia Simplificada Robusta:
         // Si hay una transacción recurrente real, asumimos que cubre parte del planificado.
         // Sumamos su monto "teórico" (el del bloque) a matchedProjectedAmount.
-        // Como no tenemos el monto teórico a mano en la tx, usamos el monto real como proxy 
+        // Como no tenemos el monto teórico a mano en la tx, usamos el monto real como proxy
         // O mejor: Si el bloque existe, lo descontamos.
-        
+
         // Vamos a iterar sobre el pool. Si encontramos un bloque de la misma categoría (por nombre o icono), lo "consumimos".
         // FinancialTransaction tiene categoryName e iconCode.
-        
-        // MEJORA: Usamos el monto de la transacción como "monto planificado cubierto" 
+
+        // MEJORA: Usamos el monto de la transacción como "monto planificado cubierto"
         // hasta el tope del bloque disponible. Esto maneja el caso "ahorré dinero".
-        // Si planifiqué 50 y gasté 45 -> Real 45. Matched 45. 
+        // Si planifiqué 50 y gasté 45 -> Real 45. Matched 45.
         // Formula: Income - Real(45) - (Planned(50) - Matched(45)) = Income - 50. Correcto.
         // Si planifiqué 50 y gasté 55 -> Real 55. Matched 50 (tope).
         // Formula: Income - 55 - (50 - 50) = Income - 55. Correcto.
-        
+
         // Para implementar esto sin ID exacto, asumiremos que los gastos recurrentes
         // siempre "intentan" cubrir bloques planificados en la columna.
-        matchedProjectedAmount += tx.amount; 
+        matchedProjectedAmount += tx.amount;
       }
     }
-    
+
     // Ajuste final: Matched no puede superar lo planificado total (para no sumar dinero mágicamente)
     if (matchedProjectedAmount > totalExpenses) {
       matchedProjectedAmount = totalExpenses;
@@ -1022,46 +1380,63 @@ class _PlanningColumn extends StatelessWidget {
     // FÓRMULA MAESTRA:
     // Disponible = (IngresoColumna + ExtraIncome) - GastosReales - (Planificado - LoQueYaSePagoDeLoPlanificado)
     // (Planificado - LoQueYaSePago) = "Planificado Pendiente"
-    final realRemaining = (income + realExtraIncome) - realTotalSpent - (totalExpenses - matchedProjectedAmount);
+    final realRemaining = (income + realExtraIncome) -
+        realTotalSpent -
+        (totalExpenses - matchedProjectedAmount);
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) => onDrop(details.data),
       builder: (context, candidateData, rejectedData) {
         final isHovered = candidateData.isNotEmpty;
-        
+
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
-            color: isHovered ? colors.primaryContainer.withAlpha(50) : colors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isHovered ? colors.primary : colors.outlineVariant.withAlpha(80), 
-              width: 1
-            ),
-            boxShadow: [
-              if (!isHovered) BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 4, offset: const Offset(0, 2))
-            ]
-          ),
+              color: isHovered
+                  ? colors.primaryContainer.withAlpha(50)
+                  : colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: isHovered
+                      ? colors.primary
+                      : colors.outlineVariant.withAlpha(80),
+                  width: 1),
+              boxShadow: [
+                if (!isHovered)
+                  BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2))
+              ]),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch, // Ocupar todo el ancho
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch, // Ocupar todo el ancho
             children: [
               // Header de la Columna
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colors.surfaceContainer,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Column(
                   children: [
-                    Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface, fontSize: 14)),
-                    Text(dateRange, style: TextStyle(fontSize: 10, color: colors.outline)),
+                    Text(title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colors.onSurface,
+                            fontSize: 14)),
+                    Text(dateRange,
+                        style: TextStyle(fontSize: 10, color: colors.outline)),
                     const Gap(8),
                     // Animación Jackpot del monto restante
                     _JackpotNumber(
                       value: realRemaining, // Usamos el cálculo real
-                      color: realRemaining >= 0 ? const Color(0xFF1DD1A1) : const Color(0xFFFF6B6B),
+                      color: realRemaining >= 0
+                          ? const Color(0xFF00B894)
+                          : const Color(0xFFE74C3C),
                     ),
                   ],
                 ),
@@ -1075,8 +1450,9 @@ class _PlanningColumn extends StatelessWidget {
                   itemBuilder: (context, i) {
                     final block = blocks[i];
                     return _ExpenseBlock(
-                      id: block.id, 
+                      id: block.id,
                       name: block.name,
+                      paymentName: block.paymentName,
                       icon: block.icon,
                       color: block.color,
                       amount: block.amount,
@@ -1099,6 +1475,7 @@ class _PlanningColumn extends StatelessWidget {
 class _ExpenseBlock extends StatelessWidget {
   final String id;
   final String name;
+  final String? paymentName; // Nombre del pago individual
   final int icon;
   final int color;
   final double amount;
@@ -1108,25 +1485,25 @@ class _ExpenseBlock extends StatelessWidget {
   final int? totalCount;
   final bool isCompact;
 
-  const _ExpenseBlock({
-    required this.id, 
-    required this.name,
-    required this.icon,
-    required this.color,
-    required this.amount,
-    this.subtitle,
-    this.isLocked = false,
-    this.paidCount,
-    this.totalCount,
-    this.isCompact = false
-  });
+  const _ExpenseBlock(
+      {required this.id,
+      required this.name,
+      this.paymentName,
+      required this.icon,
+      required this.color,
+      required this.amount,
+      this.subtitle,
+      this.isLocked = false,
+      this.paidCount,
+      this.totalCount,
+      this.isCompact = false});
 
   @override
   Widget build(BuildContext context) {
     final blockColor = Color(color);
     // Usamos el mapper para obtener el icono correcto (FontAwesome/Material)
     final blockIcon = getIconFromCode(icon);
-    
+
     // Indicador de Pagos (ej: 2/5)
     final bool showCounter = totalCount != null && totalCount! > 0;
     final bool allPaid = showCounter && paidCount == totalCount;
@@ -1137,7 +1514,9 @@ class _ExpenseBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: blockColor,
         borderRadius: BorderRadius.circular(16),
-        border: allPaid ? Border.all(color: Colors.greenAccent, width: 2) : null, // Borde verde si todo pagado
+        border: allPaid
+            ? Border.all(color: Colors.greenAccent, width: 2)
+            : null, // Borde verde si todo pagado
         boxShadow: [
           BoxShadow(
             // ignore: deprecated_member_use
@@ -1167,59 +1546,89 @@ class _ExpenseBlock extends StatelessWidget {
               // Check verde a la derecha del icono si todo está pagado
               if (allPaid) ...[
                 const Gap(4),
-                const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
+                const Icon(Icons.check_circle,
+                    color: Colors.greenAccent, size: 16),
               ],
               const Gap(8),
               Expanded(
-                child: Text(
-                  name, 
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                    ),
+                    if (paymentName != null) ...[
+                      Text(
+                        paymentName!,
+                        style: TextStyle(
+                            // ignore: deprecated_member_use
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
           ),
           const Gap(10),
           Text(
-            NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0).format(amount),
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+            NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0)
+                .format(amount),
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5),
           ),
           if (subtitle != null) ...[
             const Gap(4),
             Text(
               subtitle!,
-              // ignore: deprecated_member_use
-              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 10, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic),
             ),
           ],
           // Indicador de Pagos (2/5) y Candado (Encima del contador)
           if (!isCompact) ...[
-             const Gap(4),
-             Align(
-               alignment: Alignment.centerRight,
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.end,
-                 children: [
-                   if (isLocked) ...[
-                     const Icon(Icons.lock, color: Colors.white70, size: 12),
-                     if (showCounter) const Gap(2),
-                   ],
-                   if (showCounter)
-                     Container(
-                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                       decoration: BoxDecoration(
-                         color: Colors.black26,
-                         borderRadius: BorderRadius.circular(8)
-                       ),
-                       child: Text(
-                         "$paidCount/$totalCount",
-                         style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                       ),
-                     ),
-                 ],
-               ),
-             )
+            const Gap(4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (isLocked) ...[
+                    const Icon(Icons.lock, color: Colors.white70, size: 12),
+                    if (showCounter) const Gap(2),
+                  ],
+                  if (showCounter)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(
+                        "$paidCount/$totalCount",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            )
           ]
         ],
       ),
@@ -1234,15 +1643,16 @@ class _ExpenseBlock extends StatelessWidget {
 
     // Envolvemos en InkWell para detectar toques en bloques bloqueados
     return InkWell(
-      onTap: isLocked ? () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Este bloque está bloqueado porque el pago ya fue realizado ($subtitle)."),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          )
-        );
-      } : null,
+      onTap: isLocked
+          ? () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(
+                    "Este bloque está bloqueado porque el pago ya fue realizado ($subtitle)."),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ));
+            }
+          : null,
       child: Draggable<String>(
         data: id,
         // Si está bloqueado, no permitimos arrastrar
@@ -1251,7 +1661,20 @@ class _ExpenseBlock extends StatelessWidget {
           color: Colors.transparent,
           child: SizedBox(
             width: 110, // Ancho fijo para el feedback
-            child: Opacity(opacity: 0.9, child: _ExpenseBlock(id: id, name: name, icon: icon, color: color, amount: amount, subtitle: subtitle, isLocked: isLocked, paidCount: paidCount, totalCount: totalCount, isCompact: false)),
+            child: Opacity(
+                opacity: 0.9,
+                child: _ExpenseBlock(
+                    id: id,
+                    name: name,
+                    paymentName: paymentName,
+                    icon: icon,
+                    color: color,
+                    amount: amount,
+                    subtitle: subtitle,
+                    isLocked: isLocked,
+                    paidCount: paidCount,
+                    totalCount: totalCount,
+                    isCompact: false)),
           ),
         ),
         childWhenDragging: Opacity(opacity: 0.3, child: content),
@@ -1270,9 +1693,10 @@ class _PlanningDateSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = ref.watch(planningDateProvider);
     final now = ref.watch(nowProvider);
-    
-    bool isSameMonth(DateTime a, DateTime b) => a.year == b.year && a.month == b.month;
-    
+
+    bool isSameMonth(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month;
+
     final isThisMonth = isSameMonth(selectedDate, now);
     final nextMonthDate = DateTime(now.year, now.month + 1, 1);
     final isNextMonth = isSameMonth(selectedDate, nextMonthDate);
@@ -1283,42 +1707,66 @@ class _PlanningDateSelector extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-           _buildChip(context, ref, "Este Mes", isThisMonth, () => ref.read(planningDateProvider.notifier).state = now),
-           const Gap(8),
-           _buildChip(context, ref, "Próximo Mes", isNextMonth, () => ref.read(planningDateProvider.notifier).state = nextMonthDate),
-           const Gap(8),
-           _buildChip(context, ref, isOther ? DateFormat('MMMM y', 'es').format(selectedDate).toUpperCase() : "Otro Mes", isOther, () async {
-              final picked = await showDatePicker(
-                context: context,
+          _buildChip(context, ref, "Este Mes", isThisMonth,
+              () => ref.read(planningDateProvider.notifier).state = now),
+          const Gap(8),
+          _buildChip(
+              context,
+              ref,
+              "Próximo Mes",
+              isNextMonth,
+              () => ref.read(planningDateProvider.notifier).state =
+                  nextMonthDate),
+          const Gap(8),
+          _buildChip(
+              context,
+              ref,
+              isOther
+                  ? DateFormat('MMMM y', 'es')
+                      .format(selectedDate)
+                      .toUpperCase()
+                  : "Otro Mes",
+              isOther, () async {
+            final picked = await showDialog<DateTime>(
+              context: context,
+              builder: (context) => MonthYearPicker(
                 initialDate: isOther ? selectedDate : nextMonthDate,
-                firstDate: DateTime(now.year, now.month, 1),
+                firstDate: DateTime(now.year - 1),
                 lastDate: DateTime(now.year + 5),
-                locale: const Locale('es', 'ES'),
-              );
-              if (picked != null) {
-                ref.read(planningDateProvider.notifier).state = picked;
-              }
-           }),
+              ),
+            );
+            if (picked != null) {
+              ref.read(planningDateProvider.notifier).state = picked;
+            }
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildChip(BuildContext context, WidgetRef ref, String label, bool isSelected, VoidCallback onTap) {
-     final colors = Theme.of(context).colorScheme;
-     return GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? colors.primary : colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isSelected ? colors.primary : colors.outlineVariant.withAlpha(100)),
-          ),
-          child: Text(label, style: TextStyle(color: isSelected ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 12)),
+  Widget _buildChip(BuildContext context, WidgetRef ref, String label,
+      bool isSelected, VoidCallback onTap) {
+    final colors = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primary : colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: isSelected
+                  ? colors.primary
+                  : colors.outlineVariant.withAlpha(100)),
         ),
-     );
+        child: Text(label,
+            style: TextStyle(
+                color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12)),
+      ),
+    );
   }
 }
 
@@ -1332,8 +1780,9 @@ class _JackpotNumber extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
-    
+    final currency =
+        NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
+
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: value, end: value),
       duration: const Duration(milliseconds: 800),
@@ -1380,101 +1829,125 @@ class _HomeChartSectionState extends ConsumerState<_HomeChartSection> {
     final summaryAsync = ref.watch(homeSummaryDataProvider);
 
     return summaryAsync.when(
-      loading: () => const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
-      error: (_, __) => const SizedBox(height: 220, child: Center(child: Text("Error al cargar datos"))),
+      loading: () => const SizedBox(
+          height: 220, child: Center(child: CircularProgressIndicator())),
+      error: (_, __) => const SizedBox(
+          height: 220, child: Center(child: Text("Error al cargar datos"))),
       data: (realData) {
         // Si estamos animando, usamos los datos reales. Si no, partimos de 0 para el efecto "grow".
-        final data = _animate ? realData : (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
+        final data = _animate
+            ? realData
+            : (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
         final remaining = data.available;
 
         // Verificamos si los datos REALES están vacíos para mostrar el mensaje, no los datos de animación
-        if (_animate && realData.income == 0 && realData.expenses == 0 && realData.debts == 0) {
-       return SizedBox(
-         height: 220, 
-         child: Center(child: Text("Sin datos para proyectar", style: TextStyle(color: Theme.of(context).colorScheme.outline)))
-       );
-    }
+        if (_animate &&
+            realData.income == 0 &&
+            realData.expenses == 0 &&
+            realData.debts == 0) {
+          return SizedBox(
+              height: 220,
+              child: Center(
+                  child: Text("Sin datos para proyectar",
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.outline))));
+        }
 
-    // Secciones del gráfico
-    final sections = [
-      // 1. Ingresos (Teal)
-      if (data.income > 0)
-        PieChartSectionData(
-          value: data.income,
-          color: const Color(0xFF1DD1A1), // Esmeralda (Ingreso Real)
-          radius: 35, // Radio aumentado
-          showTitle: false,
-          // Efecto de luz/glow solicitado
-          borderSide: BorderSide(color: const Color(0xFF1DD1A1).withAlpha(100), width: 6),
-        ),
-      // 2. Gastos (Naranja)
-      if (data.expenses > 0)
-        PieChartSectionData(
-          value: data.expenses,
-          color: const Color(0xFFFF6B6B), // Coral (Gastos)
-          radius: 35,
-          showTitle: false,
-          borderSide: BorderSide(color: const Color(0xFFFF6B6B).withAlpha(100), width: 6),
-        ),
-      // 3. Deudas (Morado)
-      if (data.debts > 0)
-        PieChartSectionData(
-          value: data.debts,
-          color: const Color(0xFFE17055), // Terracota (Deudas)
-          radius: 35,
-          showTitle: false,
-          borderSide: BorderSide(color: const Color(0xFFE17055).withAlpha(100), width: 6),
-        ),
-    ];
-
-    final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
-
-    // Usamos TweenAnimationBuilder para animar el valor del texto central
-    return SizedBox(
-      height: 220, // Altura ajustada para subir el círculo
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          PieChart(
-            PieChartData(
-              sections: sections.isEmpty 
-                ? [PieChartSectionData(value: 1, color: Colors.grey.shade200, radius: 25, showTitle: false)] 
-                : sections,
-              centerSpaceRadius: 75, // Radio interno más amplio estilo iOS/FinApp
-              sectionsSpace: 4,
-              startDegreeOffset: 270, // El gráfico empieza desde arriba (las 12 en punto)
+        // Secciones del gráfico
+        final sections = [
+          // 1. Ingresos (Teal)
+          if (data.income > 0)
+            PieChartSectionData(
+              value: data.income,
+              color: const Color(0xFF00B894), // Esmeralda (Ingreso Real)
+              radius: 35, // Radio aumentado
+              showTitle: false,
+              // Efecto de luz/glow solicitado
+              borderSide: BorderSide(
+                  color: const Color(0xFF00B894).withAlpha(100), width: 6),
             ),
-            swapAnimationDuration: const Duration(milliseconds: 800),
-            swapAnimationCurve: Curves.easeInOutCubic,
-          ),
-          // Texto central
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
+          // 2. Gastos (Naranja)
+          if (data.expenses > 0)
+            PieChartSectionData(
+              value: data.expenses,
+              color: const Color(0xFFE74C3C), // Coral (Gastos)
+              radius: 35,
+              showTitle: false,
+              borderSide: BorderSide(
+                  color: const Color(0xFFE74C3C).withAlpha(100), width: 6),
+            ),
+          // 3. Deudas (Morado)
+          if (data.debts > 0)
+            PieChartSectionData(
+              value: data.debts,
+              color: const Color(0xFFD35400), // Terracota (Deudas)
+              radius: 35,
+              showTitle: false,
+              borderSide: BorderSide(
+                  color: const Color(0xFFD35400).withAlpha(100), width: 6),
+            ),
+        ];
+
+        final currencyFormat =
+            NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
+
+        // Usamos TweenAnimationBuilder para animar el valor del texto central
+        return SizedBox(
+          height: 220, // Altura ajustada para subir el círculo
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Text("Disponible", style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 14)),
-              const Gap(4),
-              TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0, end: remaining),
-                duration: const Duration(milliseconds: 1000),
-                curve: Curves.easeOutSine,
-                builder: (context, value, child) {
-                  return Text(
-                    currencyFormat.format(value),
-                    style: TextStyle(
-                      fontSize: 32, 
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      letterSpacing: -1,
-                    ),
-                  );
-                },
+              PieChart(
+                PieChartData(
+                  sections: sections.isEmpty
+                      ? [
+                          PieChartSectionData(
+                              value: 1,
+                              color: Colors.grey.shade200,
+                              radius: 25,
+                              showTitle: false)
+                        ]
+                      : sections,
+                  centerSpaceRadius:
+                      75, // Radio interno más amplio estilo iOS/FinApp
+                  sectionsSpace: 4,
+                  startDegreeOffset:
+                      270, // El gráfico empieza desde arriba (las 12 en punto)
+                ),
+                swapAnimationDuration: const Duration(milliseconds: 800),
+                swapAnimationCurve: Curves.easeInOutCubic,
               ),
+              // Texto central
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("Disponible",
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontSize: 14)),
+                  const Gap(4),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: remaining),
+                    duration: const Duration(milliseconds: 1000),
+                    curve: Curves.easeOutSine,
+                    builder: (context, value, child) {
+                      return Text(
+                        currencyFormat.format(value),
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          letterSpacing: -1,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              )
             ],
-          )
-        ],
-      ),
-    );
+          ),
+        );
       },
     );
   }
@@ -1488,10 +1961,11 @@ class _HomeInfoCards extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(homeSummaryDataProvider);
-    final data = summaryAsync.value ?? (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
-    
-    // Obtenemos el Ahorro Real desde el provider existente
-    final savings = ref.watch(currentSavingsProvider).value ?? 0.0;
+    final data = summaryAsync.value ??
+        (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
+
+    // ✅ TODO: Ahorro en 0 temporalmente hasta implementar funcionalidad
+    const savings = 0.0; // ref.watch(currentSavingsProvider).value ?? 0.0;
 
     return Column(
       children: [
@@ -1502,7 +1976,7 @@ class _HomeInfoCards extends ConsumerWidget {
               child: _SolidSummaryCard(
                 title: "Ingresos",
                 amount: data.income,
-                color: const Color(0xFF1DD1A1), // Esmeralda
+                color: const Color(0xFF00B894), // Esmeralda
                 icon: FontAwesomeIcons.moneyBillTrendUp,
               ),
             ),
@@ -1511,7 +1985,7 @@ class _HomeInfoCards extends ConsumerWidget {
               child: _SolidSummaryCard(
                 title: "Gastos Planif.",
                 amount: data.expenses,
-                color: const Color(0xFFFF6B6B), // Coral
+                color: const Color(0xFFE74C3C), // Coral
                 icon: FontAwesomeIcons.receipt,
               ),
             ),
@@ -1525,16 +1999,16 @@ class _HomeInfoCards extends ConsumerWidget {
               child: _SolidSummaryCard(
                 title: "Deudas",
                 amount: data.debts,
-                color: const Color(0xFFE17055), // Terracota
+                color: const Color(0xFFD35400), // Terracota
                 icon: FontAwesomeIcons.fileInvoiceDollar,
               ),
             ),
             const Gap(12),
-            Expanded(
+            const Expanded(
               child: _SolidSummaryCard(
                 title: "Ahorro",
                 amount: savings,
-                color: const Color(0xFF6C5CE7), // Púrpura Real
+                color: Color(0xFF9B59B6), // Púrpura Real
                 icon: FontAwesomeIcons.piggyBank,
               ),
             ),
@@ -1561,8 +2035,9 @@ class _SolidSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
-    
+    final currencyFormat =
+        NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
+
     return Container(
       height: 100,
       padding: const EdgeInsets.all(12),
@@ -1600,10 +2075,7 @@ class _SolidSummaryCard extends StatelessWidget {
           Text(
             currencyFormat.format(amount),
             style: const TextStyle(
-              fontSize: 22, 
-              fontWeight: FontWeight.w900, 
-              color: Colors.white
-            ),
+                fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
           ),
         ],
       ),

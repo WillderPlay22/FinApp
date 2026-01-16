@@ -13,11 +13,9 @@ import '../../data/models/enums.dart';
 import '../../data/models/expense.dart';
 import '../../data/models/debt.dart';
 import '../../data/models/recurring_movement.dart';
-import '../../data/models/saving.dart';
 import '../../data/models/transaction.dart';
 import '../../date_utils.dart';
 import '../../logic/providers/database_providers.dart';
-import '../../data/daos/debt_dao.dart';
 import '../../logic/providers/time_provider.dart';
 
 // Importamos las pantallas de módulos para reutilizar sus providers
@@ -69,11 +67,18 @@ final currentSavingsProvider = Provider<AsyncValue<double>>((ref) {
   return AsyncValue.data(income - expense);
 });
 
+// Fecha seleccionada para la planificación (Por defecto: Fecha actual)
+final planningDateProvider = StateProvider<DateTime>((ref) {
+  return ref.watch(nowProvider);
+});
+
 // Transacciones Reales del Mes (Para cálculo de flujo de caja en planificación)
 final monthRealTransactionsProvider = StreamProvider<List<FinancialTransaction>>((ref) async* {
   final expenseDao = ref.watch(expenseDaoProvider);
-  final now = ref.watch(nowProvider);
-  final range = getCycleDateRange(now, Frequency.monthly);
+  // Usamos la fecha de planificación seleccionada en lugar de 'now'
+  final planningDate = ref.watch(planningDateProvider);
+  final range = getCycleDateRange(planningDate, Frequency.monthly);
+  
   // MODIFICADO: Ahora traemos TODAS las transacciones (Ingresos y Gastos) para calcular bien el flujo
   final isar = await expenseDao.isarService.db;
   yield* isar.financialTransactions.filter().dateBetween(range.start, range.end).watch(fireImmediately: true);
@@ -211,6 +216,151 @@ final planningDebtsProvider = StreamProvider<List<Debt>>((ref) async* {
   yield* isar.debts.where().watch(fireImmediately: true);
 });
 
+// --- PROVIDERS PARA EL NUEVO RESUMEN (FILTRADO) ---
+
+enum SummaryFilter { currentPeriod, nextPeriod, currentMonth, nextMonth }
+
+final summaryFilterProvider = StateProvider<SummaryFilter>((ref) => SummaryFilter.currentPeriod);
+
+final homeSummaryDataProvider = FutureProvider<({double income, double expenses, double debts, double available})>((ref) async {
+  final filter = ref.watch(summaryFilterProvider);
+  final config = await ref.watch(planningConfigProvider.future);
+  final expenses = await ref.watch(allFixedExpensesProvider.future);
+  final allDebts = await ref.watch(planningDebtsProvider.future);
+  final positions = ref.watch(planningPositionsProvider);
+  final now = ref.watch(nowProvider);
+  final debtDao = ref.watch(debtDaoProvider);
+
+  // 1. Determinar índices de columnas (Periodos)
+  int currentColumnIndex = 0;
+  if (config.columns == 2) {
+    currentColumnIndex = now.day <= 15 ? 0 : 1;
+  } else if (config.columns == 4) {
+    currentColumnIndex = ((now.day - 1) / 7).floor().clamp(0, 3);
+  }
+
+  // 2. Configurar el filtro
+  int? targetColumn;
+  bool isNextMonth = false;
+  bool isFullMonth = false;
+
+  switch (filter) {
+    case SummaryFilter.currentPeriod:
+      targetColumn = currentColumnIndex;
+      break;
+    case SummaryFilter.nextPeriod:
+      targetColumn = currentColumnIndex + 1;
+      if (targetColumn >= config.columns) {
+        // Si se pasa de columnas, es el primer periodo del próximo mes
+        targetColumn = 0;
+        isNextMonth = true;
+      }
+      break;
+    case SummaryFilter.currentMonth:
+      isFullMonth = true;
+      break;
+    case SummaryFilter.nextMonth:
+      isNextMonth = true;
+      isFullMonth = true;
+      break;
+  }
+
+  // 3. Calcular Ingresos
+  double income = 0.0;
+  if (isFullMonth) {
+    // Suma de todos los ingresos del mes (usamos la config de columnas como base)
+    income = config.columnIncomes.fold(0.0, (sum, val) => sum + val);
+  } else {
+    // Ingreso de la columna específica
+    income = (targetColumn != null && targetColumn < config.columnIncomes.length) 
+        ? config.columnIncomes[targetColumn] 
+        : 0.0;
+  }
+
+  // 4. Calcular Gastos (Fijos y Deudas)
+  double totalExpenses = 0.0;
+  double totalDebts = 0.0;
+  
+  // Helper para saber si una columna cuenta para el filtro actual
+  bool isColumnIncluded(int? colIndex) {
+    if (isFullMonth) return true; // En vista mensual sumamos todo (o todo lo asignado)
+    return colIndex == targetColumn;
+  }
+
+  // A. GASTOS FIJOS
+  // Si es vista de MES COMPLETO, sumamos el total proyectado de todos los gastos activos.
+  if (isFullMonth) {
+    totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
+  } else {
+    // Si es vista de PERIODO (Pago Actual/Siguiente), usamos la PLANIFICACIÓN (Posiciones)
+    // 1. Agrupamos gastos por categoría para replicar la lógica de bloques
+    final Map<int, ({double amount, Frequency freq})> categoryData = {};
+    for (var e in expenses) {
+       final cat = e.category.value;
+       if (cat == null) continue;
+       final current = categoryData[cat.id] ?? (amount: 0.0, freq: e.frequency);
+       categoryData[cat.id] = (amount: current.amount + e.amount, freq: current.freq);
+    }
+
+    // 2. Iteramos los bloques teóricos y sumamos solo si están asignados a la columna target
+    categoryData.forEach((catId, data) {
+        int blocksCount = 1;
+        if (data.freq == Frequency.weekly) blocksCount = 4;
+        if (data.freq == Frequency.biweekly) blocksCount = 2;
+
+        for (int i = 0; i < blocksCount; i++) {
+            final blockId = "cat_${catId}_$i";
+            // Verificamos si el usuario asignó este bloque a la columna que estamos viendo
+            if (positions[blockId] == targetColumn) {
+                totalExpenses += data.amount;
+            }
+        }
+    });
+  }
+
+  // B. DEUDAS
+  // Definimos el mes de referencia para generar los bloques de deuda
+  DateTime generationDate = isNextMonth ? DateTime(now.year, now.month + 1, 1) : now;
+  DateTime startOfMonth = DateTime(generationDate.year, generationDate.month, 1);
+  DateTime endOfMonth = DateTime(generationDate.year, generationDate.month + 1, 0, 23, 59, 59);
+
+  for (var debt in allDebts) {
+    DateTime? date = debt.nextPaymentDate;
+    if (date != null) {
+       // Avanzamos la fecha hasta llegar al mes de generación si es necesario
+       if (date.isBefore(startOfMonth)) {
+          while(date!.isBefore(startOfMonth)) {
+             date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
+          }
+       }
+       
+       // Iteramos todas las cuotas dentro del mes
+       while (date!.isBefore(endOfMonth) || date.isAtSameMomentAs(endOfMonth)) {
+         if (isFullMonth) {
+           // Si es mes completo, sumamos todo
+           totalDebts += debt.installmentAmount;
+         } else {
+           // Si es periodo, verificamos si el bloque de deuda está asignado a la columna target
+           final blockId = "debt_${debt.id}_${date.day}";
+           // Nota: Si el usuario no ha movido la deuda, positions[blockId] es null.
+           // Asumimos que para el resumen de "Pago Actual" solo cuenta lo explícitamente asignado o forzado.
+           if (positions[blockId] == targetColumn) {
+              totalDebts += debt.installmentAmount;
+           }
+         }
+         date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
+       }
+    }
+  }
+
+  return (
+    income: income,
+    expenses: totalExpenses,
+    debts: totalDebts,
+    available: (income - totalExpenses - totalDebts).clamp(0.0, double.infinity)
+  );
+});
+
 // --- PANTALLA PRINCIPAL ---
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -277,15 +427,70 @@ class _SummaryTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const SingleChildScrollView(
+    // Observamos el filtro para cambiar la Key del gráfico y forzar su animación de entrada
+    final filter = ref.watch(summaryFilterProvider);
+    return SingleChildScrollView(
       physics: BouncingScrollPhysics(),
       padding: EdgeInsets.fromLTRB(20, 10, 20, 20),
       child: Column(
         children: [
-          Gap(10),
-          _HomeChartSection(),
-          Gap(30),
-          _HomeInfoCards(),
+          const Gap(10),
+          const _SummaryFilterSelector(),
+          const Gap(20),
+          _HomeChartSection(key: ValueKey(filter)),
+          const Gap(30),
+          const _HomeInfoCards(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryFilterSelector extends ConsumerWidget {
+  const _SummaryFilterSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(summaryFilterProvider);
+    final colors = Theme.of(context).colorScheme;
+
+    Widget buildOption(String label, SummaryFilter value) {
+      final isSelected = selected == value;
+      return GestureDetector(
+        onTap: () => ref.read(summaryFilterProvider.notifier).state = value,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.primary : colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? colors.primary : colors.outlineVariant.withAlpha(100),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          buildOption("Pago Actual", SummaryFilter.currentPeriod),
+          const Gap(8),
+          buildOption("Siguiente Pago", SummaryFilter.nextPeriod),
+          const Gap(8),
+          buildOption("Mes", SummaryFilter.currentMonth),
+          const Gap(8),
+          buildOption("Próximo Mes", SummaryFilter.nextMonth),
         ],
       ),
     );
@@ -314,6 +519,9 @@ class _PlanningTab extends ConsumerWidget {
     final expenses = expensesAsync.value ?? [];
     final debts = debtsAsync.value ?? [];
     final realTransactions = realTransactionsAsync.value ?? [];
+    
+    // Fecha base para la planificación
+    final planningDate = ref.watch(planningDateProvider);
 
     // 1. Agrupamos gastos por Categoría y calculamos contadores (Pagados vs Total)
     final Map<int, ({String name, int icon, int color, double amount, Frequency frequency, int totalCount, int paidCount})> groupedExpenses = {};
@@ -377,9 +585,8 @@ class _PlanningTab extends ConsumerWidget {
 
     // 3. Agregamos las DEUDAS como bloques
     // LÓGICA MEJORADA: Generar un bloque por CADA cuota dentro del mes actual
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final endOfMonth = DateTime(now.year, now.month + 1, 0);
+    final startOfMonth = DateTime(planningDate.year, planningDate.month, 1);
+    final endOfMonth = DateTime(planningDate.year, planningDate.month + 1, 0, 23, 59, 59);
     final debtDao = ref.watch(debtDaoProvider); // Necesitamos el DAO para calcular fechas
 
     for (var debt in debts) {
@@ -391,20 +598,22 @@ class _PlanningTab extends ConsumerWidget {
         DateTime date = anchorDate;
         while (date.isBefore(endOfMonth) || date.isAtSameMomentAs(endOfMonth)) {
           // ID estable basado en el día: debt_ID_DIA
-          final blockId = "debt_${debt.id}_${date.day}";
-          
-          blocks.add((
-            id: blockId,
-            name: debt.title,
-            icon: FontAwesomeIcons.fileInvoiceDollar.codePoint,
-            color: Colors.purple.shade700.value,
-            amount: debt.installmentAmount,
-            subtitle: "Vence: ${DateFormat('d MMM', 'es').format(date)}",
-            isLocked: false,
-            paidCount: null,
-            totalCount: null,
-          ));
-          
+          // Solo agregamos si cae dentro del mes seleccionado (para evitar duplicados de meses anteriores si el loop empieza antes)
+          if (date.isAfter(startOfMonth.subtract(const Duration(seconds: 1)))) {
+            final blockId = "debt_${debt.id}_${date.day}";
+            
+            blocks.add((
+              id: blockId,
+              name: debt.title,
+              icon: FontAwesomeIcons.fileInvoiceDollar.codePoint,
+              color: const Color(0xFFE17055).value, // Terracota para Deudas
+              amount: debt.installmentAmount,
+              subtitle: "Vence: ${DateFormat('d MMM', 'es').format(date)}",
+              isLocked: false,
+              paidCount: null,
+              totalCount: null,
+            ));
+          }
           date = debtDao.calculateNextPaymentDate(date, debt.frequency, debt.customDays);
         }
       }
@@ -468,7 +677,7 @@ class _PlanningTab extends ConsumerWidget {
             id: blockId,
             name: debt.title,
             icon: FontAwesomeIcons.fileInvoiceDollar.codePoint,
-            color: Colors.purple.shade700.value,
+            color: const Color(0xFFE17055).value, // Terracota
             amount: tx.amount, // Usamos el monto real pagado
             subtitle: "Pagado el ${tx.date.day}",
             isLocked: true, // BLOQUEADO
@@ -528,6 +737,9 @@ class _PlanningTab extends ConsumerWidget {
 
     return Column(
       children: [
+        // Selector de Mes para Planificación
+        const _PlanningDateSelector(),
+        const Gap(10),
         // --- ÁREA DE COLUMNAS (TABLA) ---
         Expanded(
           child: DragTarget<String>(
@@ -555,6 +767,7 @@ class _PlanningTab extends ConsumerWidget {
                   return Expanded(
                     child: _PlanningColumn(
                       index: colIndex,
+                      planningDate: planningDate, // Pasamos la fecha seleccionada
                       totalColumns: config.columns,
                       income: colIncome,
                       totalExpenses: totalExpenses,
@@ -639,6 +852,7 @@ class _PlanningTab extends ConsumerWidget {
 
 class _PlanningColumn extends StatelessWidget {
   final int index;
+  final DateTime planningDate;
   final int totalColumns;
   final double income;
   final double totalExpenses;
@@ -649,6 +863,7 @@ class _PlanningColumn extends StatelessWidget {
 
   const _PlanningColumn({
     required this.index,
+    required this.planningDate,
     required this.totalColumns,
     required this.income,
     required this.totalExpenses,
@@ -661,7 +876,8 @@ class _PlanningColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final now = DateTime.now();
+    // Usamos la fecha de planificación para los cálculos
+    final baseDate = planningDate;
 
     // Título y Fechas Dinámicas
     String title = "";
@@ -673,26 +889,26 @@ class _PlanningColumn extends StatelessWidget {
       // Lógica Quincenal
       if (index == 0) {
         title = "Pago Fin de Mes";
-        dateRange = "Cubre: 1 - 15 ${DateFormat('MMM', 'es').format(now)}";
-        colStart = DateTime(now.year, now.month, 1);
-        colEnd = DateTime(now.year, now.month, 15, 23, 59, 59);
+        dateRange = "Cubre: 1 - 15 ${DateFormat('MMM', 'es').format(baseDate)}";
+        colStart = DateTime(baseDate.year, baseDate.month, 1);
+        colEnd = DateTime(baseDate.year, baseDate.month, 15, 23, 59, 59);
       } else {
         title = "Pago Quincena";
-        dateRange = "Cubre: 16 - ${DateTime(now.year, now.month + 1, 0).day} ${DateFormat('MMM', 'es').format(now)}";
-        colStart = DateTime(now.year, now.month, 16);
-        colEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+        dateRange = "Cubre: 16 - ${DateTime(baseDate.year, baseDate.month + 1, 0).day} ${DateFormat('MMM', 'es').format(baseDate)}";
+        colStart = DateTime(baseDate.year, baseDate.month, 16);
+        colEnd = DateTime(baseDate.year, baseDate.month + 1, 0, 23, 59, 59);
       }
     } else if (totalColumns == 4) {
       title = "Semana ${index + 1}";
       dateRange = ""; // Simplificado para semanal
       // Cálculo aproximado de semanas
-      colStart = DateTime(now.year, now.month, 1).add(Duration(days: index * 7));
+      colStart = DateTime(baseDate.year, baseDate.month, 1).add(Duration(days: index * 7));
       colEnd = colStart.add(const Duration(days: 6, hours: 23, minutes: 59));
     } else {
       title = "Mes Completo";
-      dateRange = DateFormat('MMMM', 'es').format(now);
-      colStart = DateTime(now.year, now.month, 1);
-      colEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      dateRange = DateFormat('MMMM', 'es').format(baseDate);
+      colStart = DateTime(baseDate.year, baseDate.month, 1);
+      colEnd = DateTime(baseDate.year, baseDate.month + 1, 0, 23, 59, 59);
     }
 
     // --- CÁLCULO DEL DISPONIBLE REAL (JACKPOT) ---
@@ -784,10 +1000,6 @@ class _PlanningColumn extends StatelessWidget {
         
         // Vamos a iterar sobre el pool. Si encontramos un bloque de la misma categoría (por nombre o icono), lo "consumimos".
         // FinancialTransaction tiene categoryName e iconCode.
-        final matchKey = categoryBlockPool.keys.firstWhere(
-          (k) => true, // Difícil coincidir por ID sin cargar la relación.
-          orElse: () => -1
-        );
         
         // MEJORA: Usamos el monto de la transacción como "monto planificado cubierto" 
         // hasta el tope del bloque disponible. Esto maneja el caso "ahorré dinero".
@@ -849,7 +1061,7 @@ class _PlanningColumn extends StatelessWidget {
                     // Animación Jackpot del monto restante
                     _JackpotNumber(
                       value: realRemaining, // Usamos el cálculo real
-                      color: realRemaining >= 0 ? Colors.teal : Colors.red,
+                      color: realRemaining >= 0 ? const Color(0xFF1DD1A1) : const Color(0xFFFF6B6B),
                     ),
                   ],
                 ),
@@ -1049,6 +1261,67 @@ class _ExpenseBlock extends StatelessWidget {
   }
 }
 
+// --- SELECTOR DE FECHA PARA PLANIFICACIÓN ---
+
+class _PlanningDateSelector extends ConsumerWidget {
+  const _PlanningDateSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedDate = ref.watch(planningDateProvider);
+    final now = ref.watch(nowProvider);
+    
+    bool isSameMonth(DateTime a, DateTime b) => a.year == b.year && a.month == b.month;
+    
+    final isThisMonth = isSameMonth(selectedDate, now);
+    final nextMonthDate = DateTime(now.year, now.month + 1, 1);
+    final isNextMonth = isSameMonth(selectedDate, nextMonthDate);
+    final isOther = !isThisMonth && !isNextMonth;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+           _buildChip(context, ref, "Este Mes", isThisMonth, () => ref.read(planningDateProvider.notifier).state = now),
+           const Gap(8),
+           _buildChip(context, ref, "Próximo Mes", isNextMonth, () => ref.read(planningDateProvider.notifier).state = nextMonthDate),
+           const Gap(8),
+           _buildChip(context, ref, isOther ? DateFormat('MMMM y', 'es').format(selectedDate).toUpperCase() : "Otro Mes", isOther, () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: isOther ? selectedDate : nextMonthDate,
+                firstDate: DateTime(now.year, now.month, 1),
+                lastDate: DateTime(now.year + 5),
+                locale: const Locale('es', 'ES'),
+              );
+              if (picked != null) {
+                ref.read(planningDateProvider.notifier).state = picked;
+              }
+           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(BuildContext context, WidgetRef ref, String label, bool isSelected, VoidCallback onTap) {
+     final colors = Theme.of(context).colorScheme;
+     return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.primary : colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isSelected ? colors.primary : colors.outlineVariant.withAlpha(100)),
+          ),
+          child: Text(label, style: TextStyle(color: isSelected ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 12)),
+        ),
+     );
+  }
+}
+
 // --- WIDGET DE ANIMACIÓN JACKPOT ---
 
 class _JackpotNumber extends StatelessWidget {
@@ -1083,23 +1356,39 @@ class _JackpotNumber extends StatelessWidget {
 
 // --- SECCIÓN DEL GRÁFICO (DONA) ---
 
-class _HomeChartSection extends ConsumerWidget {
-  const _HomeChartSection();
+class _HomeChartSection extends ConsumerStatefulWidget {
+  const _HomeChartSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Usamos los totales proyectados para mostrar la disponibilidad teórica del mes
-    final incomeAsync = ref.watch(incomeProjectedTotalProvider);
-    final expensesAsync = ref.watch(projectedTotalProvider); // De expenses_screen.dart
-    
-    final projectedIncome = incomeAsync.value ?? 0.0;
-    final projectedExpenses = expensesAsync.value ?? 0.0;
-    
-    // Calculamos el restante (Disponible)
-    final remaining = (projectedIncome - projectedExpenses).clamp(0.0, double.infinity);
-    
-    // Si no hay datos, mostramos estado vacío
-    if (projectedIncome == 0 && projectedExpenses == 0) {
+  ConsumerState<_HomeChartSection> createState() => _HomeChartSectionState();
+}
+
+class _HomeChartSectionState extends ConsumerState<_HomeChartSection> {
+  bool _animate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Retrasamos ligeramente la animación para que el gráfico arranque desde 0 y crezca
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _animate = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summaryAsync = ref.watch(homeSummaryDataProvider);
+
+    return summaryAsync.when(
+      loading: () => const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
+      error: (_, __) => const SizedBox(height: 220, child: Center(child: Text("Error al cargar datos"))),
+      data: (realData) {
+        // Si estamos animando, usamos los datos reales. Si no, partimos de 0 para el efecto "grow".
+        final data = _animate ? realData : (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
+        final remaining = data.available;
+
+        // Verificamos si los datos REALES están vacíos para mostrar el mensaje, no los datos de animación
+        if (_animate && realData.income == 0 && realData.expenses == 0 && realData.debts == 0) {
        return SizedBox(
          height: 220, 
          child: Center(child: Text("Sin datos para proyectar", style: TextStyle(color: Theme.of(context).colorScheme.outline)))
@@ -1108,26 +1397,39 @@ class _HomeChartSection extends ConsumerWidget {
 
     // Secciones del gráfico
     final sections = [
-      // Sección de Gastos (Rojo)
-      if (projectedExpenses > 0)
+      // 1. Ingresos (Teal)
+      if (data.income > 0)
         PieChartSectionData(
-          value: projectedExpenses,
-          color: Colors.red.shade400,
-          radius: 25,
+          value: data.income,
+          color: const Color(0xFF1DD1A1), // Esmeralda (Ingreso Real)
+          radius: 35, // Radio aumentado
           showTitle: false,
+          // Efecto de luz/glow solicitado
+          borderSide: BorderSide(color: const Color(0xFF1DD1A1).withAlpha(100), width: 6),
         ),
-      // Sección de Disponible (Verde)
-      if (remaining > 0)
+      // 2. Gastos (Naranja)
+      if (data.expenses > 0)
         PieChartSectionData(
-          value: remaining,
-          color: Colors.green.shade400,
-          radius: 25,
+          value: data.expenses,
+          color: const Color(0xFFFF6B6B), // Coral (Gastos)
+          radius: 35,
           showTitle: false,
+          borderSide: BorderSide(color: const Color(0xFFFF6B6B).withAlpha(100), width: 6),
+        ),
+      // 3. Deudas (Morado)
+      if (data.debts > 0)
+        PieChartSectionData(
+          value: data.debts,
+          color: const Color(0xFFE17055), // Terracota (Deudas)
+          radius: 35,
+          showTitle: false,
+          borderSide: BorderSide(color: const Color(0xFFE17055).withAlpha(100), width: 6),
         ),
     ];
 
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
 
+    // Usamos TweenAnimationBuilder para animar el valor del texto central
     return SizedBox(
       height: 220, // Altura ajustada para subir el círculo
       child: Stack(
@@ -1152,19 +1454,28 @@ class _HomeChartSection extends ConsumerWidget {
             children: [
               Text("Disponible", style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 14)),
               const Gap(4),
-              Text(
-                currencyFormat.format(remaining),
-                style: TextStyle(
-                  fontSize: 32, 
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  letterSpacing: -1,
-                ),
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: remaining),
+                duration: const Duration(milliseconds: 1000),
+                curve: Curves.easeOutSine,
+                builder: (context, value, child) {
+                  return Text(
+                    currencyFormat.format(value),
+                    style: TextStyle(
+                      fontSize: 32, 
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      letterSpacing: -1,
+                    ),
+                  );
+                },
               ),
             ],
           )
         ],
       ),
+    );
+      },
     );
   }
 }
@@ -1176,104 +1487,55 @@ class _HomeInfoCards extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Datos de Ingresos
-    final incomeExecuted = ref.watch(incomeExecutedTotalProvider).value ?? 0.0;
-    final incomeProjected = ref.watch(incomeProjectedTotalProvider).value ?? 0.0;
-
-    // 2. Datos de Pagos Fijos
-    final fixedStatus = ref.watch(fixedPaymentsStatusProvider).value ?? (paid: 0, total: 0);
-
-    // 3. Datos de Deudas
-    final debtPaid = ref.watch(debtPaidTotalProvider).value ?? 0.0;
-    final debtPending = ref.watch(debtPendingTotalProvider).value ?? 0.0;
-
-    // 4. Datos de Ahorro
+    final summaryAsync = ref.watch(homeSummaryDataProvider);
+    final data = summaryAsync.value ?? (income: 0.0, expenses: 0.0, debts: 0.0, available: 0.0);
+    
+    // Obtenemos el Ahorro Real desde el provider existente
     final savings = ref.watch(currentSavingsProvider).value ?? 0.0;
 
     return Column(
       children: [
-        // Fila 1: Ingresos y Ahorro
+        // Fila 1: Ingresos y Gastos
         Row(
           children: [
             Expanded(
-              child: _InfoCard(
+              child: _SolidSummaryCard(
                 title: "Ingresos",
+                amount: data.income,
+                color: const Color(0xFF1DD1A1), // Esmeralda
                 icon: FontAwesomeIcons.moneyBillTrendUp,
-                color: Colors.teal,
-                content: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ValueRow("Percibido", incomeExecuted),
-                    const Gap(4),
-                    _ValueRow("Proyectado", incomeProjected, isSecondary: true),
-                  ],
-                ),
               ),
             ),
             const Gap(12),
             Expanded(
-              child: _InfoCard(
-                title: "Ahorro Actual",
-                icon: FontAwesomeIcons.piggyBank,
-                color: Colors.amber.shade700,
-                content: Center(
-                  child: Text(
-                    NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0).format(savings),
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-                  ),
-                ),
+              child: _SolidSummaryCard(
+                title: "Gastos Planif.",
+                amount: data.expenses,
+                color: const Color(0xFFFF6B6B), // Coral
+                icon: FontAwesomeIcons.receipt,
               ),
             ),
           ],
         ),
         const Gap(12),
-        // Fila 2: Pagos Fijos y Deudas
+        // Fila 2: Deudas y Ahorro
         Row(
           children: [
             Expanded(
-              child: _InfoCard(
-                title: "Pagos Fijos",
-                icon: FontAwesomeIcons.calendarCheck,
-                color: Colors.blue.shade700,
-                content: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          "${fixedStatus.paid}",
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "/${fixedStatus.total}",
-                          style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.outline),
-                        ),
-                      ],
-                    ),
-                    const Text("Realizados", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  ],
-                ),
+              child: _SolidSummaryCard(
+                title: "Deudas",
+                amount: data.debts,
+                color: const Color(0xFFE17055), // Terracota
+                icon: FontAwesomeIcons.fileInvoiceDollar,
               ),
             ),
             const Gap(12),
             Expanded(
-              child: _InfoCard(
-                title: "Deudas",
-                icon: FontAwesomeIcons.fileInvoiceDollar,
-                color: Colors.purple.shade700,
-                content: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ValueRow("Pagado", debtPaid),
-                    const Gap(4),
-                    _ValueRow("Pendiente", debtPending, isSecondary: true),
-                  ],
-                ),
+              child: _SolidSummaryCard(
+                title: "Ahorro",
+                amount: savings,
+                color: const Color(0xFF6C5CE7), // Púrpura Real
+                icon: FontAwesomeIcons.piggyBank,
               ),
             ),
           ],
@@ -1283,100 +1545,68 @@ class _HomeInfoCards extends ConsumerWidget {
   }
 }
 
-
-// Widget base para las tarjetas
-class _InfoCard extends StatelessWidget {
+// Nueva Tarjeta Sólida (Estilo Expenses)
+class _SolidSummaryCard extends StatelessWidget {
   final String title;
-  final IconData icon;
+  final double amount;
   final Color color;
-  final Widget content;
+  final IconData icon;
 
-  const _InfoCard({
+  const _SolidSummaryCard({
     required this.title,
-    required this.icon,
+    required this.amount,
     required this.color,
-    required this.content,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 0);
+    
     return Container(
-      height: 135,
-      padding: const EdgeInsets.all(16),
+      height: 100,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
-        // Sombra suave para dar profundidad
+        color: color,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((255 * 0.03).round()),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+            color: color.withAlpha(100),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Header de la tarjeta con icono y título
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withAlpha((255 * 0.1).round()),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 14, color: color),
-              ),
-              const Gap(8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.outline, 
-                    fontWeight: FontWeight.w600
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Icon(icon, size: 12, color: Colors.white70),
+              const Gap(6),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
-          const Spacer(),
-          // Contenido dinámico
-          content,
-          const Spacer(),
+          const Gap(8),
+          Text(
+            currencyFormat.format(amount),
+            style: const TextStyle(
+              fontSize: 22, 
+              fontWeight: FontWeight.w900, 
+              color: Colors.white
+            ),
+          ),
         ],
       ),
-    );
-  }
-}
-
-// Widget auxiliar para filas de valores (Etiqueta + Monto)
-class _ValueRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final bool isSecondary;
-
-  const _ValueRow(this.label, this.amount, {this.isSecondary = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final format = NumberFormat.compactCurrency(locale: 'es', symbol: '\$', decimalDigits: 1);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 11, color: isSecondary ? Colors.grey : null)),
-        Text(
-          format.format(amount),
-          style: TextStyle(
-            fontSize: isSecondary ? 12 : 15,
-            fontWeight: isSecondary ? FontWeight.normal : FontWeight.bold,
-            color: isSecondary ? Colors.grey : null,
-          ),
-        ),
-      ],
     );
   }
 }

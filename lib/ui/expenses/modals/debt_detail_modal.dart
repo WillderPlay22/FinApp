@@ -68,7 +68,7 @@ class DebtDetailModal extends ConsumerWidget {
 
   Widget _buildHeader(BuildContext context, WidgetRef ref, Debt debt) {
     final colors = Theme.of(context).colorScheme;
-    final cardColor = Colors.purple.shade700;
+    final cardColor = const Color(0xFFE17055); // Terracota
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -280,28 +280,40 @@ class DebtDetailModal extends ConsumerWidget {
     final amountController = TextEditingController();
     return showDialog<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextFormField(
-          controller: amountController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: "Monto a Pagar",
-            prefixText: "\$",
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(amountController.text);
-              Navigator.pop(ctx, amount);
-            },
-            child: const Text("Confirmar Pago"),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        bool isValid = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(title),
+              content: TextFormField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: "Monto a Pagar",
+                  prefixText: "\$",
+                ),
+                autofocus: true,
+                onChanged: (value) {
+                  setState(() {
+                    isValid = value.isNotEmpty && (double.tryParse(value) ?? 0) > 0;
+                  });
+                },
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+                ElevatedButton(
+                  onPressed: isValid ? () {
+                    final amount = double.tryParse(amountController.text);
+                    Navigator.pop(ctx, amount);
+                  } : null,
+                  child: const Text("Confirmar Pago"),
+                ),
+              ],
+            );
+          }
+        );
+      },
     );
   }
 

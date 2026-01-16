@@ -42,6 +42,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
 
   // Para evitar bucles infinitos en los listeners
   bool _isUpdating = false;
+  bool _isFormValid = false;
 
   @override
   void initState() {
@@ -55,6 +56,11 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
     _installmentCountFocus.addListener(_recalculate);
     _installmentAmountFocus.addListener(_recalculate);
     _initialPaymentFocus.addListener(_recalculate);
+    
+    _titleController.addListener(_validateForm);
+    _totalAmountController.addListener(_validateForm);
+    _installmentCountController.addListener(_validateForm);
+    _installmentAmountController.addListener(_validateForm);
   }
 
   @override
@@ -69,11 +75,26 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
     _installmentCountFocus.removeListener(_recalculate);
     _installmentAmountFocus.removeListener(_recalculate);
     _initialPaymentFocus.removeListener(_recalculate);
+    
+    _titleController.removeListener(_validateForm);
+    _totalAmountController.removeListener(_validateForm);
+    _installmentCountController.removeListener(_validateForm);
+    _installmentAmountController.removeListener(_validateForm);
+    
     _totalAmountFocus.dispose();
     _installmentCountFocus.dispose();
     _installmentAmountFocus.dispose();
     _initialPaymentFocus.dispose();
     super.dispose();
+  }
+
+  void _validateForm() {
+    final isValid = _titleController.text.isNotEmpty &&
+        _totalAmountController.text.isNotEmpty &&
+        _installmentCountController.text.isNotEmpty &&
+        _installmentAmountController.text.isNotEmpty;
+        
+    if (isValid != _isFormValid) setState(() => _isFormValid = isValid);
   }
 
   void _recalculate() {
@@ -267,9 +288,9 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
               const Gap(30),
 
               ElevatedButton(
-                onPressed: _showSummary,
+                onPressed: _isFormValid ? _showSummary : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade700,
+                  backgroundColor: const Color(0xFFE17055), // Terracota
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                 ),

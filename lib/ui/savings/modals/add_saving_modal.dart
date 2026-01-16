@@ -20,8 +20,32 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
 
   SavingType _selectedType = SavingType.goal;
   SavingMethod _selectedMethod = SavingMethod.fixed;
-  int _selectedColor = 0xFFE91E63;
+  int _selectedColor = 0xFF6C5CE7; // Púrpura Real
   int _selectedIcon = FontAwesomeIcons.piggyBank.codePoint;
+  bool _isFormValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_validateForm);
+    _targetController.addListener(_validateForm);
+    _valueController.addListener(_validateForm);
+  }
+
+  @override
+  void dispose() {
+    _nameController.removeListener(_validateForm);
+    _targetController.removeListener(_validateForm);
+    _valueController.removeListener(_validateForm);
+    super.dispose();
+  }
+
+  void _validateForm() {
+    bool isValid = _nameController.text.isNotEmpty && _valueController.text.isNotEmpty;
+    if (_selectedType == SavingType.goal) isValid = isValid && _targetController.text.isNotEmpty;
+    
+    if (isValid != _isFormValid) setState(() => _isFormValid = isValid);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +144,9 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
             const Gap(20),
 
             ElevatedButton(
-              onPressed: _save,
+              onPressed: _isFormValid ? _save : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pinkAccent,
+                backgroundColor: const Color(0xFF6C5CE7), // Púrpura
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -138,19 +162,22 @@ class _AddSavingModalState extends ConsumerState<AddSavingModal> {
   Widget _buildTypeSelector(String title, String sub, IconData icon, SavingType type, ColorScheme colors) {
     final isSelected = _selectedType == type;
     return GestureDetector(
-      onTap: () => setState(() => _selectedType = type),
+      onTap: () {
+        setState(() => _selectedType = type);
+        _validateForm();
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.pinkAccent.withAlpha(30) : colors.surfaceContainer,
-          border: Border.all(color: isSelected ? Colors.pinkAccent : Colors.transparent, width: 2),
+          color: isSelected ? const Color(0xFF6C5CE7).withAlpha(30) : colors.surfaceContainer,
+          border: Border.all(color: isSelected ? const Color(0xFF6C5CE7) : Colors.transparent, width: 2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? Colors.pinkAccent : colors.outline),
+            Icon(icon, color: isSelected ? const Color(0xFF6C5CE7) : colors.outline),
             const Gap(5),
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.pinkAccent : colors.onSurface)),
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? const Color(0xFF6C5CE7) : colors.onSurface)),
             Text(sub, style: TextStyle(fontSize: 10, color: colors.outline)),
           ],
         ),

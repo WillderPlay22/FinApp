@@ -130,8 +130,8 @@ final debtChartDataProvider = Provider<AsyncValue<Map<String, ({double total, in
   final pending = pendingAsync.value ?? 0.0;
 
   return AsyncValue.data({
-    "Pagado": (total: paid, color: Colors.teal.shade700.value),
-    "Pendiente": (total: pending, color: Colors.purple.shade700.value),
+    "Pagado": (total: paid, color: const Color(0xFF1DD1A1).value), // Esmeralda
+    "Pendiente": (total: pending, color: const Color(0xFFE17055).value), // Terracota
   });
 });
 
@@ -249,7 +249,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           ),
           label: const Text("Gasto"),
           icon: const Icon(Icons.add),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFFF6B6B), // Coral
         );
       case 1: // Pestaña "Deudas"
         return FloatingActionButton.extended(
@@ -264,7 +264,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> with SingleTick
           }, 
           label: const Text("Deuda"),
           icon: const Icon(Icons.add),
-          backgroundColor: Colors.purple.shade700, // Color consistente con la tarjeta de deudas
+          backgroundColor: const Color(0xFFE17055), // Terracota
         );
       case 2: // Pestaña "Historial"
       default:

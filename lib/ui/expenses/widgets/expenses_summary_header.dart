@@ -87,13 +87,13 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
             _SummaryCard(
               title: "Gastado",
               amountAsync: widget.executedTotal,
-              color: Colors.red.shade700,
+              color: const Color(0xFFFF6B6B), // Coral
             ),
             const Gap(12),
             _SummaryCard(
               title: "Proyectado del mes",
               amountAsync: widget.projectedTotal,
-              color: Colors.blue.shade700,
+              color: const Color(0xFFFFA502), // Mandarina
             ),
           ],
         );
@@ -106,13 +106,13 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
             _SummaryCard(
               title: "MONTO TOTAL PAGADO",
               amountAsync: widget.executedTotal,
-              color: Colors.teal.shade700,
+              color: const Color(0xFF1DD1A1), // Esmeralda
             ),
             const Gap(12),
             _SummaryCard(
               title: "MONTO TOTAL DE DEUDAS PENDIENTES",
               amountAsync: widget.projectedTotal,
-              color: Colors.purple.shade700,
+              color: const Color(0xFFE17055), // Terracota
             ),
           ],
         );
@@ -124,7 +124,7 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
           child: _SummaryCard(
             title: "Total del Periodo",
             amountAsync: widget.historyTotal,
-            color: Colors.orange.shade800,
+            color: const Color(0xFFFF6B6B), // Coral
             isEnlarged: true,
           ),
         );

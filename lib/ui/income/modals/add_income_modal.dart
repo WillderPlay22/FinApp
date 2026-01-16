@@ -34,6 +34,39 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
   final TextEditingController _amountLastController = TextEditingController();
   final TextEditingController _recurringAmountController = TextEditingController();
   bool _isDailyVariable = false;
+  bool _isFormValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController.addListener(_validateForm);
+    _amountController.addListener(_validateForm);
+    _amount15Controller.addListener(_validateForm);
+    _amountLastController.addListener(_validateForm);
+    _recurringAmountController.addListener(_validateForm);
+  }
+
+  @override
+  void dispose() {
+    _titleController.removeListener(_validateForm);
+    _amountController.removeListener(_validateForm);
+    _amount15Controller.removeListener(_validateForm);
+    _amountLastController.removeListener(_validateForm);
+    _recurringAmountController.removeListener(_validateForm);
+    super.dispose();
+  }
+
+  void _validateForm() {
+    bool isValid = false;
+    if (_isRecurring) {
+      if (_titleController.text.isNotEmpty) {
+        isValid = _selectedFrequency == Frequency.biweekly ? (_amount15Controller.text.isNotEmpty && _amountLastController.text.isNotEmpty) : _recurringAmountController.text.isNotEmpty;
+      }
+    } else {
+      isValid = _amountController.text.isNotEmpty;
+    }
+    if (isValid != _isFormValid) setState(() => _isFormValid = isValid);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,16 +101,19 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
                   children: [
                     Text("Extra", style: TextStyle(
                       fontWeight: !_isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: !_isRecurring ? Colors.teal : colors.outline
+                      color: !_isRecurring ? const Color(0xFF1DD1A1) : colors.outline
                     )),
                     Switch(
                       value: _isRecurring,
-                      onChanged: (value) => setState(() => _isRecurring = value),
-                      activeTrackColor: Colors.teal,
+                      onChanged: (value) {
+                        setState(() => _isRecurring = value);
+                        _validateForm();
+                      },
+                      activeTrackColor: const Color(0xFF1DD1A1), // Esmeralda
                     ),
                     Text("Fijo", style: TextStyle(
                       fontWeight: _isRecurring ? FontWeight.bold : FontWeight.normal,
-                      color: _isRecurring ? Colors.teal : colors.outline
+                      color: _isRecurring ? const Color(0xFF1DD1A1) : colors.outline
                     )),
                   ],
                 ),
@@ -95,9 +131,9 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             const Gap(20),
 
             ElevatedButton(
-              onPressed: _saveData,
+              onPressed: _isFormValid ? _saveData : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
+                backgroundColor: const Color(0xFF1DD1A1), // Esmeralda
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -175,7 +211,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..type = TransactionType.income
           ..categoryName = "Extra"
           ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
-          ..colorValue = 0xFF4CAF50; // Equivalente a Colors.green.value
+          ..colorValue = 0xFF1DD1A1; // Esmeralda
 
         await transactionDao.addTransaction(newTransaction);
       }
@@ -229,7 +265,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             ),
             child: Row(
               children: [
-                const Icon(FontAwesomeIcons.calendarDay, color: Colors.teal),
+                const Icon(FontAwesomeIcons.calendarDay, color: Color(0xFF1DD1A1)),
                 const Gap(10),
                 Expanded(
                   child: Text(
@@ -274,7 +310,10 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
             DropdownMenuItem(value: Frequency.daily, child: Text("Diario")),
           ],
           onChanged: (val) {
-            if (val != null) setState(() => _selectedFrequency = val);
+            if (val != null) {
+              setState(() => _selectedFrequency = val);
+              _validateForm();
+            }
           },
         ),
         const Gap(20),
@@ -354,7 +393,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
               onTap: () => setState(() => _selectedDayOfWeek = index + 1),
               child: CircleAvatar(
                 radius: 18,
-                backgroundColor: isSelected ? Colors.teal : colors.surfaceContainerHighest,
+                backgroundColor: isSelected ? const Color(0xFF1DD1A1) : colors.surfaceContainerHighest,
                 foregroundColor: isSelected ? Colors.white : colors.onSurface,
                 child: Text(days[index], style: const TextStyle(fontSize: 12)),
               ),

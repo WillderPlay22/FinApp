@@ -25,7 +25,7 @@ class ExpenseSummaryHeader extends ConsumerWidget {
                   title: "Ejecutado",
                   amount: total,
                   icon: FontAwesomeIcons.moneyBillTrendUp,
-                  color: Colors.red,
+                  color: const Color(0xFFFF6B6B), // Coral
                   isFilled: true,
                 );
               },
@@ -44,7 +44,7 @@ class ExpenseSummaryHeader extends ConsumerWidget {
                   title: "Proyectado",
                   amount: total,
                   icon: FontAwesomeIcons.chartLine,
-                  color: Colors.orange,
+                  color: const Color(0xFFFFA502), // Mandarina
                   isFilled: false,
                 );
               },
@@ -60,7 +60,7 @@ class _SummaryCard extends StatelessWidget {
   final String title;
   final double amount;
   final IconData icon;
-  final MaterialColor color;
+  final Color color; // Cambiado de MaterialColor a Color
   final bool isFilled;
 
   const _SummaryCard({
@@ -74,7 +74,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bgColor = isFilled ? color.shade600 : theme.cardColor;
+    final bgColor = isFilled ? color : theme.cardColor; // Usamos el color directo
     final textColor = isFilled ? Colors.white : theme.colorScheme.onSurface;
     final subTextColor = isFilled ? Colors.white70 : theme.colorScheme.outline;
 

@@ -37,6 +37,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
   bool _isFixedExpense = false;
   DateTime _selectedDate = DateTime.now();
   Category? _selectedCategory;
+  bool _isFormValid = false;
 
   @override
   void initState() {
@@ -57,7 +58,25 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       if (widget.isFromSaving) {
         _isFixedExpense = false; // Si viene de ahorro, siempre es gasto extra
       }
+      // Validar formulario inicial
+      _validateForm();
     }
+    _amountController.addListener(_validateForm);
+    _noteController.addListener(_validateForm);
+  }
+
+  @override
+  void dispose() {
+    _amountController.removeListener(_validateForm);
+    _noteController.removeListener(_validateForm);
+    super.dispose();
+  }
+
+  void _validateForm() {
+    final isValid = _amountController.text.isNotEmpty && 
+                    _noteController.text.isNotEmpty && 
+                    _selectedCategory != null;
+    if (isValid != _isFormValid) setState(() => _isFormValid = isValid);
   }
   
   @override
@@ -110,10 +129,10 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.red),
+            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Color(0xFFFF6B6B)),
             decoration: InputDecoration(
               hintText: widget.maxAmount != null ? "Máx ${widget.maxAmount}" : "0.00",
-              prefixIcon: const Icon(Icons.attach_money, color: Colors.red),
+              prefixIcon: const Icon(Icons.attach_money, color: Color(0xFFFF6B6B)),
               border: InputBorder.none,
               hintStyle: TextStyle(color: colors.outline.withAlpha((255 * 0.3).round())),
             ),
@@ -150,9 +169,9 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _saveExpense,
+              onPressed: _isFormValid ? _saveExpense : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: const Color(0xFFFF6B6B), // Coral
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -166,8 +185,8 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
             const Gap(10),
             TextButton.icon(
               onPressed: _deleteExpense,
-              icon: const Icon(Icons.delete, color: Colors.red),
-              label: const Text("Eliminar este Item", style: TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.delete, color: Color(0xFFFF6B6B)),
+              label: const Text("Eliminar este Item", style: TextStyle(color: Color(0xFFFF6B6B))),
             )
           ],
           const Gap(20),
@@ -251,6 +270,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                   return GestureDetector(
                     onTap: () {
                       setState(() => _selectedCategory = category);
+                      _validateForm();
                     },
                     child: Column(
                       children: [

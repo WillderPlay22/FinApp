@@ -29,15 +29,19 @@ class ExpenseDao {
 
   /// ✅ LÓGICA CLAVE: Marca un gasto fijo como pagado.
   /// Crea una transacción en el historial.
-  Future<void> markFixedExpenseAsPaid(Expense expense) async {
+  /// Si se pasa [amountOverride], se usa ese monto en lugar del monto proyectado del gasto.
+  Future<void> markFixedExpenseAsPaid(Expense expense,
+      {double? amountOverride}) async {
     final isar = await isarService.db;
-    final now = ref.read(nowProvider); // Usamos la fecha de la app (real o simulada)
+    final now =
+        ref.read(nowProvider); // Usamos la fecha de la app (real o simulada)
     final category = expense.category.value;
 
     if (category == null) return; // Chequeo de seguridad
 
     final transaction = FinancialTransaction()
-      ..amount = expense.amount
+      ..amount =
+          amountOverride ?? expense.amount // ✅ Usar monto override si existe
       ..date = now
       ..note = expense.title // El nombre del item es la nota de la transacción
       ..type = TransactionType.expense
@@ -45,7 +49,8 @@ class ExpenseDao {
       ..categoryName = category.name
       ..categoryIconCode = category.iconCode
       ..colorValue = category.colorValue
-      ..relatedExpense.value = expense; // Enlazamos la transacción al gasto fijo original
+      ..relatedExpense.value =
+          expense; // Enlazamos la transacción al gasto fijo original
 
     await isar.writeTxn(() async {
       await isar.financialTransactions.put(transaction);
@@ -66,7 +71,10 @@ class ExpenseDao {
     }
 
     // Creamos una consulta que observa las transacciones de este gasto específico.
-    final query = isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(expense.id)).build();
+    final query = isar.financialTransactions
+        .filter()
+        .relatedExpense((q) => q.idEqualTo(expense.id))
+        .build();
 
     // `watch(fireImmediately: true)` emite un valor inicial y luego cada vez que la consulta cambia.
     await for (final _ in query.watch(fireImmediately: true)) {
@@ -78,12 +86,14 @@ class ExpenseDao {
       final transactionsInCycle = await isar.financialTransactions
           .filter()
           .relatedExpense((q) => q.idEqualTo(expense.id))
-          .dateBetween(cycleRange.start, cycleRange.end, includeLower: true, includeUpper: true)
+          .dateBetween(cycleRange.start, cycleRange.end,
+              includeLower: true, includeUpper: true)
           .findAll();
 
       final isPaid = transactionsInCycle.isNotEmpty;
       final paymentCount = transactionsInCycle.length;
-      final totalSpent = transactionsInCycle.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+      final totalSpent =
+          transactionsInCycle.fold<double>(0.0, (sum, tx) => sum + tx.amount);
 
       yield CycleStatus(
         totalSpent: totalSpent,
@@ -143,7 +153,10 @@ class ExpenseDao {
         // 2. Buscar si ya existe una transacción ligada a este gasto.
         FinancialTransaction? transaction;
         if (id != null) {
-          transaction = await isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(id)).findFirst();
+          transaction = await isar.financialTransactions
+              .filter()
+              .relatedExpense((q) => q.idEqualTo(id))
+              .findFirst();
         }
         transaction ??= FinancialTransaction();
 
@@ -178,7 +191,10 @@ class ExpenseDao {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
       // Borra las transacciones del historial que pertenecen a este gasto
-      await isar.financialTransactions.filter().relatedExpense((q) => q.idEqualTo(expenseId)).deleteAll();
+      await isar.financialTransactions
+          .filter()
+          .relatedExpense((q) => q.idEqualTo(expenseId))
+          .deleteAll();
       // Borra el gasto
       await isar.expenses.filter().idEqualTo(expenseId).deleteAll();
     });
@@ -189,16 +205,20 @@ class ExpenseDao {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
       // 1. Encontrar todos los gastos de esta categoría
-      final expensesToDelete = await isar.expenses.filter().category((q) => q.idEqualTo(categoryId)).findAll();
+      final expensesToDelete = await isar.expenses
+          .filter()
+          .category((q) => q.idEqualTo(categoryId))
+          .findAll();
       final expenseIds = expensesToDelete.map((e) => e.id).toList();
 
       if (expenseIds.isNotEmpty) {
         // 2. Borrar todas las transacciones que apuntan a esos gastos
         await isar.financialTransactions
             .filter()
-            .anyOf(expenseIds, (q, int id) => q.relatedExpense((r) => r.idEqualTo(id)))
+            .anyOf(expenseIds,
+                (q, int id) => q.relatedExpense((r) => r.idEqualTo(id)))
             .deleteAll();
-        
+
         // 3. Borrar todos los gastos de la categoría
         await isar.expenses.deleteAll(expenseIds);
       }
@@ -212,24 +232,34 @@ class ExpenseDao {
   Future<void> deleteTransaction(Id transactionId) async {
     final isar = await isarService.db;
     await isar.writeTxn(() async {
-      await isar.financialTransactions.filter().idEqualTo(transactionId).deleteAll();
+      await isar.financialTransactions
+          .filter()
+          .idEqualTo(transactionId)
+          .deleteAll();
     });
   }
 
   // Observa todos los gastos fijos (para la lista principal)
   Stream<List<Expense>> watchFixedExpenses() async* {
     final isar = await isarService.db;
-    yield* isar.expenses.filter().isRecurringEqualTo(true).watch(fireImmediately: true);
+    yield* isar.expenses
+        .filter()
+        .isRecurringEqualTo(true)
+        .watch(fireImmediately: true);
   }
 
   // Observa los gastos de una categoría específica
   Stream<List<Expense>> watchExpensesForCategory(int categoryId) async* {
     final isar = await isarService.db;
-    yield* isar.expenses.filter().category((q) => q.idEqualTo(categoryId)).watch(fireImmediately: true);
+    yield* isar.expenses
+        .filter()
+        .category((q) => q.idEqualTo(categoryId))
+        .watch(fireImmediately: true);
   }
 
   // ✅ Observa el historial de transacciones de gastos para un período específico.
-  Stream<List<FinancialTransaction>> watchExpenseTransactionsInDateRange(DateRange range) async* {
+  Stream<List<FinancialTransaction>> watchExpenseTransactionsInDateRange(
+      DateRange range) async* {
     final isar = await isarService.db;
     yield* isar.financialTransactions
         .where()
@@ -244,7 +274,8 @@ class ExpenseDao {
 
   /// ✅ Observa el resumen de gastos EJECUTADOS y los agrupa por categoría para un rango de fechas.
   /// Usado por el gráfico en la pestaña "Historial".
-  Stream<Map<String, ({double total, int color})>> watchCategorizedSummaryInDateRange(DateRange range) async* {
+  Stream<Map<String, ({double total, int color})>>
+      watchCategorizedSummaryInDateRange(DateRange range) async* {
     final isar = await isarService.db;
     final query = isar.financialTransactions
         .filter()
@@ -260,8 +291,10 @@ class ExpenseDao {
       }
 
       for (final tx in transactions) {
-        final current = summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
-        summaryMap[tx.categoryName] = (total: current.total + tx.amount, color: tx.colorValue);
+        final current =
+            summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
+        summaryMap[tx.categoryName] =
+            (total: current.total + tx.amount, color: tx.colorValue);
       }
       yield summaryMap;
     }
@@ -269,7 +302,8 @@ class ExpenseDao {
 
   /// ✅ Observa la PROYECCIÓN de gastos fijos y los agrupa por categoría.
   /// Usado como una de las fuentes para el gráfico en la pestaña "Categorías".
-  Stream<Map<String, ({double total, int color})>> watchCategorizedFixedProjection() async* {
+  Stream<Map<String, ({double total, int color})>>
+      watchCategorizedFixedProjection() async* {
     final isar = await isarService.db;
     final query = isar.expenses.filter().isRecurringEqualTo(true).build();
     await for (final fixedExpenses in query.watch(fireImmediately: true)) {
@@ -278,8 +312,10 @@ class ExpenseDao {
         final category = expense.category.value;
         if (category == null) continue;
         final monthlyAmount = getMonthlyAmount(expense);
-        final current = projectionMap[category.name] ?? (total: 0.0, color: category.colorValue);
-        projectionMap[category.name] = (total: current.total + monthlyAmount, color: category.colorValue);
+        final current = projectionMap[category.name] ??
+            (total: 0.0, color: category.colorValue);
+        projectionMap[category.name] =
+            (total: current.total + monthlyAmount, color: category.colorValue);
       }
       yield projectionMap;
     }
@@ -287,15 +323,23 @@ class ExpenseDao {
 
   /// ✅ Observa los gastos EXTRA (no recurrentes) en un rango de fechas y los agrupa por categoría.
   /// Usado como fuente para el gráfico en la pestaña "Categorías".
-  Stream<Map<String, ({double total, int color})>> watchCategorizedExtrasInDateRange(DateRange range) async* {
+  Stream<Map<String, ({double total, int color})>>
+      watchCategorizedExtrasInDateRange(DateRange range) async* {
     final isar = await isarService.db;
-    final query = isar.financialTransactions.filter().typeEqualTo(TransactionType.expense).isRecurringEqualTo(false).dateBetween(range.start, range.end).build();
+    final query = isar.financialTransactions
+        .filter()
+        .typeEqualTo(TransactionType.expense)
+        .isRecurringEqualTo(false)
+        .dateBetween(range.start, range.end)
+        .build();
 
     await for (final transactions in query.watch(fireImmediately: true)) {
       final Map<String, ({double total, int color})> summaryMap = {};
       for (final tx in transactions) {
-        final current = summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
-        summaryMap[tx.categoryName] = (total: current.total + tx.amount, color: tx.colorValue);
+        final current =
+            summaryMap[tx.categoryName] ?? (total: 0.0, color: tx.colorValue);
+        summaryMap[tx.categoryName] =
+            (total: current.total + tx.amount, color: tx.colorValue);
       }
       yield summaryMap;
     }
@@ -316,7 +360,8 @@ class ExpenseDao {
         .build();
 
     await for (final transactions in query.watch(fireImmediately: true)) {
-      final total = transactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+      final total =
+          transactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
       yield total;
     }
   }
@@ -330,7 +375,8 @@ class ExpenseDao {
     await for (final _ in query.watch(fireImmediately: true)) {
       double projectedTotal = 0;
       // 1. Sumar la proyección de todos los gastos fijos
-      final fixedExpenses = await isar.expenses.filter().isRecurringEqualTo(true).findAll();
+      final fixedExpenses =
+          await isar.expenses.filter().isRecurringEqualTo(true).findAll();
       for (final expense in fixedExpenses) {
         projectedTotal += getMonthlyAmount(expense);
       }
@@ -339,12 +385,13 @@ class ExpenseDao {
       final now = ref.read(nowProvider);
       final monthRange = getCycleDateRange(now, Frequency.monthly);
       final extraTransactions = await isar.financialTransactions
-        .filter()
-        .isRecurringEqualTo(false)
-        .typeEqualTo(TransactionType.expense)
-        .dateBetween(monthRange.start, monthRange.end)
-        .findAll();
-      projectedTotal += extraTransactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+          .filter()
+          .isRecurringEqualTo(false)
+          .typeEqualTo(TransactionType.expense)
+          .dateBetween(monthRange.start, monthRange.end)
+          .findAll();
+      projectedTotal +=
+          extraTransactions.fold<double>(0.0, (sum, tx) => sum + tx.amount);
 
       yield projectedTotal;
     }
@@ -353,11 +400,16 @@ class ExpenseDao {
   // Helper para calcular el valor mensual de un gasto fijo
   double getMonthlyAmount(Expense expense) {
     switch (expense.frequency) {
-      case Frequency.daily: return expense.amount * 30;
-      case Frequency.weekly: return expense.amount * 4;
-      case Frequency.biweekly: return expense.amount * 2;
-      case Frequency.monthly: return expense.amount;
-      case Frequency.yearly: return expense.amount / 12;
+      case Frequency.daily:
+        return expense.amount * 30;
+      case Frequency.weekly:
+        return expense.amount * 4;
+      case Frequency.biweekly:
+        return expense.amount * 2;
+      case Frequency.monthly:
+        return expense.amount;
+      case Frequency.yearly:
+        return expense.amount / 12;
       case Frequency.none:
         return 0;
     }

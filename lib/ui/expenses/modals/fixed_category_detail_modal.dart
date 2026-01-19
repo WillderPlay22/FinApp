@@ -12,7 +12,8 @@ import 'create_category_modal.dart'; // Asumimos que este es tu modal para crear
 
 // ✅ 1. Se crea un provider que "observa" la lista de gastos de una categoría específica.
 // Cada vez que un gasto se añade, edita o borra, este provider lo notificará.
-final categoryExpensesProvider = StreamProvider.family<List<Expense>, int>((ref, categoryId) {
+final categoryExpensesProvider =
+    StreamProvider.family<List<Expense>, int>((ref, categoryId) {
   final expenseDao = ref.watch(expenseDaoProvider);
   return expenseDao.watchExpensesForCategory(categoryId);
 });
@@ -33,7 +34,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
     // `ref.watch` reconstruirá este widget cuando cualquiera de los dos emita nuevos datos.
     final expensesAsyncValue = ref.watch(categoryExpensesProvider(categoryId));
     // Usamos el método `watchCategory` que añadiste a tu CategoryDao.
-    final categoryStream = ref.watch(categoryDaoProvider).watchCategory(categoryId);
+    final categoryStream =
+        ref.watch(categoryDaoProvider).watchCategory(categoryId);
 
     return StreamBuilder<Category?>(
       stream: categoryStream,
@@ -62,7 +64,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                 decoration: BoxDecoration(
                   // ignore: deprecated_member_use
                   color: Color(category.colorValue).withOpacity(0.15),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(30)),
                 ),
                 child: Row(
                   children: [
@@ -76,8 +79,12 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(category.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                          Text(getFrequencyLabel(category.frequency), style: TextStyle(color: colors.outline, letterSpacing: 1.2)),
+                          Text(category.name,
+                              style: const TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold)),
+                          Text(getFrequencyLabel(category.frequency),
+                              style: TextStyle(
+                                  color: colors.outline, letterSpacing: 1.2)),
                         ],
                       ),
                     ),
@@ -90,13 +97,15 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                           context: context,
                           isScrollControlled: true,
                           useSafeArea: true,
-                          builder: (context) => CreateCategoryModal(categoryToEdit: category),
+                          builder: (context) =>
+                              CreateCategoryModal(categoryToEdit: category),
                         );
                       },
                     ),
                     // ✅ BOTÓN DE BORRADO DE CATEGORÍA
                     IconButton(
-                      icon: Icon(Icons.delete_forever_outlined, color: colors.error),
+                      icon: Icon(Icons.delete_forever_outlined,
+                          color: colors.error),
                       tooltip: "Eliminar Categoría",
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
@@ -106,10 +115,14 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                             content: Text(
                                 "Se borrará la categoría '${category.name}', todos sus pagos asociados y su historial de transacciones.\n\nEsta acción no se puede deshacer."),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
+                              TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text("Cancelar")),
                               TextButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  child: Text("Eliminar", style: TextStyle(color: colors.error))),
+                                  child: Text("Eliminar",
+                                      style: TextStyle(color: colors.error))),
                             ],
                           ),
                         );
@@ -118,12 +131,14 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                         if (confirm == true && context.mounted) {
                           final navigator = Navigator.of(context);
                           final messenger = ScaffoldMessenger.of(context);
-                          
-                          await ref.read(expenseDaoProvider).deleteCategoryAndRelatedData(categoryId);
-                          
+
+                          await ref
+                              .read(expenseDaoProvider)
+                              .deleteCategoryAndRelatedData(categoryId);
+
                           navigator.pop(); // Cerramos el modal explícitamente
-                          messenger.showSnackBar(
-                              const SnackBar(content: Text("Categoría eliminada con éxito.")));
+                          messenger.showSnackBar(const SnackBar(
+                              content: Text("Categoría eliminada con éxito.")));
                         }
                       },
                     ),
@@ -137,7 +152,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                 child: expensesAsyncValue.when(
                   data: (expenses) {
                     if (expenses.isEmpty) {
-                      return const Center(child: Text("No hay pagos en esta categoría."));
+                      return const Center(
+                          child: Text("No hay pagos en esta categoría."));
                     }
                     return ListView.separated(
                       padding: const EdgeInsets.all(20),
@@ -145,11 +161,13 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                       separatorBuilder: (c, i) => const Gap(12),
                       itemBuilder: (context, index) {
                         final expense = expenses[index];
-                        return _ExpenseChildItem(expense: expense, expenseDao: expenseDao);
+                        return _ExpenseChildItem(
+                            expense: expense, expenseDao: expenseDao);
                       },
                     );
                   },
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (err, stack) => Center(child: Text("Error: $err")),
                 ),
               ),
@@ -164,7 +182,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        builder: (ctx) => AddExpenseModal(preSelectedCategory: category),
+                        builder: (ctx) =>
+                            AddExpenseModal(preSelectedCategory: category),
                       );
                     },
                     icon: const Icon(Icons.add),
@@ -198,7 +217,8 @@ class _ExpenseChildItem extends StatelessWidget {
     return StreamBuilder<CycleStatus>(
       stream: expenseDao.watchCycleStatus(expense),
       builder: (context, snapshot) {
-        final status = snapshot.data ?? CycleStatus(totalSpent: 0, paymentCount: 0, isFullyPaid: false);
+        final status = snapshot.data ??
+            CycleStatus(totalSpent: 0, paymentCount: 0, isFullyPaid: false);
         final isPaid = status.isFullyPaid;
 
         return InkWell(
@@ -213,9 +233,12 @@ class _ExpenseChildItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
               // ignore: deprecated_member_use
-              color: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
+              color:
+                  colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
               borderRadius: BorderRadius.circular(12),
-              border: isPaid ? Border.all(color: Colors.red.shade300, width: 1.5) : null,
+              border: isPaid
+                  ? Border.all(color: Colors.red.shade300, width: 1.5)
+                  : null,
             ),
             child: Row(
               children: [
@@ -223,8 +246,18 @@ class _ExpenseChildItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(expense.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, decoration: isPaid ? TextDecoration.lineThrough : null, color: isPaid ? Colors.grey : null)),
-                      Text("\$${expense.amount.toStringAsFixed(2)}", style: TextStyle(color: isPaid ? Colors.red.shade300 : colors.primary, fontWeight: FontWeight.bold)),
+                      Text(expense.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              decoration:
+                                  isPaid ? TextDecoration.lineThrough : null,
+                              color: isPaid ? Colors.grey : null)),
+                      Text("\$${expense.amount.toStringAsFixed(2)}",
+                          style: TextStyle(
+                              color:
+                                  isPaid ? Colors.red.shade300 : colors.primary,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -232,10 +265,12 @@ class _ExpenseChildItem extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.check_circle_outline, size: 28),
                     color: colors.outline,
-                    onPressed: () => _confirmPayment(context, expenseDao, expense),
+                    onPressed: () =>
+                        _confirmPayment(context, expenseDao, expense),
                   )
                 else
-                  Icon(Icons.check_circle, color: Colors.red.shade300, size: 28),
+                  Icon(Icons.check_circle,
+                      color: Colors.red.shade300, size: 28),
               ],
             ),
           ),
@@ -245,23 +280,84 @@ class _ExpenseChildItem extends StatelessWidget {
   }
 
   void _confirmPayment(BuildContext context, ExpenseDao dao, Expense expense) {
-    showDialog(
+    final controller =
+        TextEditingController(text: expense.amount.toStringAsFixed(0));
+    final category = expense.category.value;
+    final categoryColor =
+        category != null ? Color(category.colorValue) : Colors.grey;
+
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text("Pagar ${expense.title}"),
-        content: Text("¿Confirmar pago de \$${expense.amount}?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancelar")),
-          ElevatedButton(
-            onPressed: () async {
-              await dao.markFixedExpenseAsPaid(expense);
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
-            },
-            child: const Text("Confirmar"),
-          )
-        ],
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            top: 20,
+            left: 20,
+            right: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text("Confirmar Pago: ${expense.title}",
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center),
+            if (category != null) ...[
+              const Gap(8),
+              Text("Categoría: ${category.name}",
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  textAlign: TextAlign.center),
+            ],
+            const Gap(20),
+            TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              autofocus: true,
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: categoryColor),
+              decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.attach_money, color: categoryColor),
+                  border: const OutlineInputBorder(),
+                  hintText: "Monto pagado"),
+            ),
+            const Gap(20),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: categoryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              icon: const Icon(Icons.check_circle),
+              label: const Text("Confirmar Pago"),
+              onPressed: () async {
+                final paidAmount = double.tryParse(controller.text) ?? 0.0;
+                if (paidAmount > 0) {
+                  await dao.markFixedExpenseAsPaid(expense,
+                      amountOverride: paidAmount);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          "Pago de \$${paidAmount.toStringAsFixed(0)} confirmado"),
+                      backgroundColor: categoryColor,
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                }
+              },
+            ),
+            const Gap(8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancelar"),
+            ),
+          ],
+        ),
       ),
     );
   }

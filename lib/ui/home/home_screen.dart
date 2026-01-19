@@ -463,13 +463,35 @@ final homeSummaryDataProvider = FutureProvider<
   }
 
   // A. GASTOS FIJOS
-  // ✅ CORRECCIÓN: Solo contar bloques que están ASIGNADOS a alguna columna
-  // Bloques en el pool (sin posición) no cuentan ni para períodos ni para mes completo
+  // ✅ CORRECCIÓN: Usar montos REALES cuando hay transacciones pagadas
+  // 1. Obtener todas las transacciones de gastos recurrentes en el período
+  final expenseTransactions = await isar.financialTransactions
+      .filter()
+      .typeEqualTo(TransactionType.expense)
+      .isRecurringEqualTo(true)
+      .dateBetween(periodStart, periodEnd)
+      .findAll();
+
+  // Crear un mapa de expenseId -> lista de montos pagados
+  final Map<int, List<double>> paidExpenseAmounts = {};
+  for (var tx in expenseTransactions) {
+    await tx.relatedExpense.load();
+    final expenseId = tx.relatedExpense.value?.id;
+    if (expenseId != null) {
+      paidExpenseAmounts.putIfAbsent(expenseId, () => []);
+      paidExpenseAmounts[expenseId]!.add(tx.amount);
+    }
+  }
+
   for (var expense in expenses) {
     // Determinar cuántos bloques genera este gasto según su frecuencia
     int blocksCount = 1;
     if (expense.frequency == Frequency.weekly) blocksCount = 4;
     if (expense.frequency == Frequency.biweekly) blocksCount = 2;
+
+    // Obtener los pagos reales para este gasto
+    final paidAmounts = paidExpenseAmounts[expense.id] ?? [];
+    int usedPaidIndex = 0;
 
     for (int i = 0; i < blocksCount; i++) {
       // ✅ Usar el mismo formato de ID que _PlanningTab: "exp_${expenseId}_$i"
@@ -482,11 +504,27 @@ final homeSummaryDataProvider = FutureProvider<
         // Para mes completo: contar si está asignado a CUALQUIER columna
         // Para período: contar solo si está en la columna target
         if (isFullMonth || isColumnIncluded(assignedCol)) {
-          totalExpenses += expense.amount;
+          // ✅ Si hay un pago real disponible, usar ese. Si no, usar proyectado.
+          if (usedPaidIndex < paidAmounts.length) {
+            totalExpenses += paidAmounts[usedPaidIndex];
+            usedPaidIndex++;
+          } else {
+            totalExpenses += expense.amount;
+          }
         }
       }
     }
   }
+
+  // B. GASTOS EXTRAS (no recurrentes) en el período
+  final extraExpenseTxs = await isar.financialTransactions
+      .filter()
+      .typeEqualTo(TransactionType.expense)
+      .isRecurringEqualTo(false)
+      .dateBetween(periodStart, periodEnd)
+      .findAll();
+
+  totalExpenses += extraExpenseTxs.fold(0.0, (s, t) => s + t.amount);
 
   // B. DEUDAS
   // ✅ CORRECCIÓN: Sincronizar con la lógica de _PlanningTab (incluye límite de cuotas)
@@ -774,7 +812,8 @@ class _PlanningTab extends ConsumerWidget {
           String? subtitle,
           bool isLocked,
           int? paidCount,
-          int? totalCount
+          int? totalCount,
+          int? expenseId // ✅ ID del gasto para confirmación
         })> blocks = [];
 
     groupedExpenses.forEach((expenseId, data) {
@@ -796,6 +835,7 @@ class _PlanningTab extends ConsumerWidget {
           isLocked: false,
           paidCount: data.paidCount,
           totalCount: data.totalCount,
+          expenseId: expenseId, // ✅ ID del gasto para confirmación
         ));
       }
     });
@@ -840,6 +880,7 @@ class _PlanningTab extends ConsumerWidget {
               isLocked: false,
               paidCount: null,
               totalCount: null,
+              expenseId: null, // ✅ Deudas no tienen expenseId
             ));
 
             // Consumimos una cuota proyectada
@@ -916,6 +957,7 @@ class _PlanningTab extends ConsumerWidget {
             isLocked: true, // BLOQUEADO
             paidCount: null,
             totalCount: null,
+            expenseId: null, // ✅ Deudas no tienen expenseId
           );
         } else {
           // Si no existe (porque era una cuota pasada que ya no sale en pendientes), lo creamos
@@ -931,6 +973,7 @@ class _PlanningTab extends ConsumerWidget {
             isLocked: true, // BLOQUEADO
             paidCount: null,
             totalCount: null,
+            expenseId: null, // ✅ Deudas no tienen expenseId
           ));
           forcedPositions[blockId] = colIndex;
           lockedIds.add(blockId);
@@ -956,18 +999,20 @@ class _PlanningTab extends ConsumerWidget {
 
         if (blockIndex != -1) {
           final block = blocks[blockIndex];
-          // Lo marcamos como bloqueado y asignado
+          // Lo marcamos como bloqueado y asignado con monto REAL
           blocks[blockIndex] = (
             id: block.id,
             name: block.name,
             paymentName: block.paymentName,
             icon: block.icon,
             color: block.color,
-            amount: block.amount,
-            subtitle: "Pago realizado",
+            amount: tx.amount, // ✅ Usar monto REAL de la transacción
+            subtitle: "Pagado: \$${tx.amount.toStringAsFixed(0)}",
             isLocked: true,
             paidCount: block.paidCount,
             totalCount: block.totalCount,
+            expenseId:
+                block.expenseId, // ✅ Mantener expenseId del bloque original
           );
 
           forcedPositions[block.id] = colIndex;
@@ -1159,7 +1204,8 @@ class _PlanningTab extends ConsumerWidget {
                                               isLocked: b.isLocked,
                                               paidCount: b.paidCount,
                                               totalCount: b.totalCount,
-                                              isCompact: true)),
+                                              isCompact: true,
+                                              expenseId: b.expenseId)),
                                     ),
                                     childWhenDragging: Opacity(
                                         opacity: 0.3,
@@ -1174,7 +1220,8 @@ class _PlanningTab extends ConsumerWidget {
                                             isLocked: b.isLocked,
                                             paidCount: b.paidCount,
                                             totalCount: b.totalCount,
-                                            isCompact: true)),
+                                            isCompact: true,
+                                            expenseId: b.expenseId)),
                                     child: _ExpenseBlock(
                                         id: b.id,
                                         name: b.name,
@@ -1186,7 +1233,8 @@ class _PlanningTab extends ConsumerWidget {
                                         isLocked: b.isLocked,
                                         paidCount: b.paidCount,
                                         totalCount: b.totalCount,
-                                        isCompact: true),
+                                        isCompact: true,
+                                        expenseId: b.expenseId),
                                   );
                                 }).toList(),
                               ),
@@ -1460,6 +1508,7 @@ class _PlanningColumn extends StatelessWidget {
                       isLocked: block.isLocked,
                       paidCount: block.paidCount,
                       totalCount: block.totalCount,
+                      expenseId: block.expenseId,
                     );
                   },
                 ),
@@ -1472,7 +1521,7 @@ class _PlanningColumn extends StatelessWidget {
   }
 }
 
-class _ExpenseBlock extends StatelessWidget {
+class _ExpenseBlock extends ConsumerWidget {
   final String id;
   final String name;
   final String? paymentName; // Nombre del pago individual
@@ -1484,22 +1533,26 @@ class _ExpenseBlock extends StatelessWidget {
   final int? paidCount;
   final int? totalCount;
   final bool isCompact;
+  // ✅ Parámetro expenseId para referencia (aunque ya no se usa para confirmar desde aquí)
+  final int? expenseId;
 
-  const _ExpenseBlock(
-      {required this.id,
-      required this.name,
-      this.paymentName,
-      required this.icon,
-      required this.color,
-      required this.amount,
-      this.subtitle,
-      this.isLocked = false,
-      this.paidCount,
-      this.totalCount,
-      this.isCompact = false});
+  const _ExpenseBlock({
+    required this.id,
+    required this.name,
+    this.paymentName,
+    required this.icon,
+    required this.color,
+    required this.amount,
+    this.subtitle,
+    this.isLocked = false,
+    this.paidCount,
+    this.totalCount,
+    this.isCompact = false,
+    this.expenseId,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final blockColor = Color(color);
     // Usamos el mapper para obtener el icono correcto (FontAwesome/Material)
     final blockIcon = getIconFromCode(icon);
@@ -1641,7 +1694,7 @@ class _ExpenseBlock extends StatelessWidget {
       );
     }
 
-    // Envolvemos en InkWell para detectar toques en bloques bloqueados
+    // Envolvemos en InkWell para detectar toques
     return InkWell(
       onTap: isLocked
           ? () {
@@ -1652,7 +1705,7 @@ class _ExpenseBlock extends StatelessWidget {
                 behavior: SnackBarBehavior.floating,
               ));
             }
-          : null,
+          : null, // ✅ Ya no se puede confirmar desde planificación
       child: Draggable<String>(
         data: id,
         // Si está bloqueado, no permitimos arrastrar
@@ -1674,7 +1727,8 @@ class _ExpenseBlock extends StatelessWidget {
                     isLocked: isLocked,
                     paidCount: paidCount,
                     totalCount: totalCount,
-                    isCompact: false)),
+                    isCompact: false,
+                    expenseId: expenseId)),
           ),
         ),
         childWhenDragging: Opacity(opacity: 0.3, child: content),

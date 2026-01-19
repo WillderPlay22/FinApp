@@ -32,12 +32,15 @@ class FixedCategoryDetailModal extends ConsumerWidget {
             decoration: BoxDecoration(
               // ignore: deprecated_member_use
               color: Color(category.colorValue).withOpacity(0.15),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: Row(
               children: [
                 Icon(
-                  IconData(category.iconCode, fontFamily: 'FontAwesomeSolid', fontPackage: 'font_awesome_flutter'),
+                  IconData(category.iconCode,
+                      fontFamily: 'FontAwesomeSolid',
+                      fontPackage: 'font_awesome_flutter'),
                   color: Color(category.colorValue),
                   size: 30,
                 ),
@@ -46,8 +49,12 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(category.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text("Gastos fijos ${_getFrequencyLabel(category.frequency)}", style: TextStyle(color: colors.outline)),
+                      Text(category.name,
+                          style: const TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(
+                          "Gastos fijos ${_getFrequencyLabel(category.frequency)}",
+                          style: TextStyle(color: colors.outline)),
                     ],
                   ),
                 ),
@@ -70,7 +77,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
               separatorBuilder: (c, i) => const Gap(12),
               itemBuilder: (context, index) {
                 final expense = data.expenses[index];
-                return _ExpenseChildItem(expense: expense, expenseDao: expenseDao);
+                return _ExpenseChildItem(
+                    expense: expense, expenseDao: expenseDao);
               },
             ),
           ),
@@ -86,7 +94,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    builder: (ctx) => AddExpenseModal(preSelectedCategory: category),
+                    builder: (ctx) =>
+                        AddExpenseModal(preSelectedCategory: category),
                   );
                 },
                 icon: const Icon(Icons.add),
@@ -104,7 +113,8 @@ class FixedCategoryDetailModal extends ConsumerWidget {
     );
   }
 
-  String _getFrequencyLabel(dynamic freq) => freq.toString().split('.').last.toUpperCase();
+  String _getFrequencyLabel(dynamic freq) =>
+      freq.toString().split('.').last.toUpperCase();
 }
 
 class _ExpenseChildItem extends StatelessWidget {
@@ -121,7 +131,8 @@ class _ExpenseChildItem extends StatelessWidget {
     return StreamBuilder<CycleStatus>(
       stream: expenseDao.watchCycleStatus(expense),
       builder: (context, snapshot) {
-        final status = snapshot.data ?? CycleStatus(totalSpent: 0, paymentCount: 0, isFullyPaid: false);
+        final status = snapshot.data ??
+            CycleStatus(totalSpent: 0, paymentCount: 0, isFullyPaid: false);
         final isPaid = status.isFullyPaid;
 
         return InkWell(
@@ -139,7 +150,8 @@ class _ExpenseChildItem extends StatelessWidget {
               // ignore: deprecated_member_use
               color: colors.surfaceContainerHighest.withOpacity(0.3),
               borderRadius: BorderRadius.circular(12),
-              border: isPaid ? Border.all(color: Colors.green, width: 1.5) : null,
+              border:
+                  isPaid ? Border.all(color: Colors.green, width: 1.5) : null,
             ),
             child: Row(
               children: [
@@ -147,18 +159,28 @@ class _ExpenseChildItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(expense.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, decoration: isPaid ? TextDecoration.lineThrough : null, color: isPaid ? Colors.grey : colors.onSurface)),
-                      Text("\$${expense.amount.toStringAsFixed(2)}", style: TextStyle(color: isPaid ? Colors.green : colors.primary, fontWeight: FontWeight.bold)),
+                      Text(expense.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              decoration:
+                                  isPaid ? TextDecoration.lineThrough : null,
+                              color: isPaid ? Colors.grey : colors.onSurface)),
+                      Text("\$${expense.amount.toStringAsFixed(2)}",
+                          style: TextStyle(
+                              color: isPaid ? Colors.green : colors.primary,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
-                
+
                 // BOTÓN DE PAGO RÁPIDO
                 if (!isPaid)
                   IconButton(
                     icon: const Icon(Icons.check_circle_outline, size: 28),
                     color: colors.outline,
-                    onPressed: () => _confirmPayment(context, expenseDao, expense),
+                    onPressed: () =>
+                        _confirmPayment(context, expenseDao, expense),
                   )
                 else
                   const Icon(Icons.check_circle, color: Colors.green, size: 28),
@@ -171,21 +193,84 @@ class _ExpenseChildItem extends StatelessWidget {
   }
 
   void _confirmPayment(BuildContext context, ExpenseDao dao, Expense expense) {
-    showDialog(
+    final controller =
+        TextEditingController(text: expense.amount.toStringAsFixed(0));
+    final category = expense.category.value;
+    final categoryColor =
+        category != null ? Color(category.colorValue) : Colors.grey;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("Pagar ${expense.title}"),
-        content: Text("¿Confirmar pago de \$${expense.amount}?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
-          ElevatedButton(
-            onPressed: () {
-              dao.markFixedExpenseAsPaid(expense);
-              Navigator.pop(ctx);
-            },
-            child: const Text("Confirmar"),
-          )
-        ],
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            top: 20,
+            left: 20,
+            right: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text("Confirmar Pago: ${expense.title}",
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center),
+            if (category != null) ...[
+              const Gap(8),
+              Text("Categoría: ${category.name}",
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  textAlign: TextAlign.center),
+            ],
+            const Gap(20),
+            TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              autofocus: true,
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: categoryColor),
+              decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.attach_money, color: categoryColor),
+                  border: const OutlineInputBorder(),
+                  hintText: "Monto pagado"),
+            ),
+            const Gap(20),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: categoryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              icon: const Icon(Icons.check_circle),
+              label: const Text("Confirmar Pago"),
+              onPressed: () async {
+                final paidAmount = double.tryParse(controller.text) ?? 0.0;
+                if (paidAmount > 0) {
+                  await dao.markFixedExpenseAsPaid(expense,
+                      amountOverride: paidAmount);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          "Pago de \$${paidAmount.toStringAsFixed(0)} confirmado"),
+                      backgroundColor: categoryColor,
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                }
+              },
+            ),
+            const Gap(8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancelar"),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Willder/OneDrive/Documentos/Programacion/PROYECTOS EN FLUTTER/FINAPP/finapp/lib/data/daos -type f -name *.dart)",
+      "Bash(grep -E \"\\\\.dart$\")",
+      "Bash(grep \"\\\\.dart$\")",
+      "Bash(dart run:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter pub:*)",
+      "Bash(dart analyze:*)",
+      "WebFetch(domain:dolarapi.com)",
+      "WebFetch(domain:ve.dolarapi.com)",
+      "Bash(xargs grep:*)",
+      "Bash(python3 scripts/search.py \"fintech personal finance budgeting dashboard mobile\" --design-system -p \"FinApp Planning\")",
+      "Bash(python scripts/search.py \"fintech personal finance budgeting dashboard mobile\" --design-system -p \"FinApp Planning\")",
+      "Bash(python scripts/search.py \"budget planning card swipeable mobile\" --stack flutter)",
+      "Bash(python scripts/search.py \"layout responsive\" --stack flutter)",
+      "Bash(python scripts/search.py \"drag drop card mobile touch\" --domain ux)",
+      "Bash(python -c \"from PIL import Image; print\\('pillow ok'\\)\")",
+      "Bash(python:*)",
+      "Bash(flutter build:*)",
+      "mcp__dart__analyze_files"
+    ]
+  }
+}

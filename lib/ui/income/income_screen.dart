@@ -12,6 +12,7 @@ import 'widgets/income_summary_header.dart';
 import 'widgets/fixed_income_list.dart';
 import 'widgets/income_history_list.dart';
 import 'modals/add_income_modal.dart';
+import '../../config/theme/app_colors.dart';
 
 // --- PROVIDERS PARA EL RESUMEN DE INGRESOS ---
 
@@ -24,9 +25,13 @@ final historyDateRangeProvider = StateProvider<DateRange>((ref) {
 // Total Proyectado (Suma de todos los ingresos fijos activos)
 final incomeProjectedTotalProvider = StreamProvider<double>((ref) async* {
   final isar = await IsarService().db;
-  yield* isar.recurringMovements.where().watch(fireImmediately: true).map((movements) {
+  yield* isar.recurringMovements
+      .where()
+      .watch(fireImmediately: true)
+      .map((movements) {
     // Sumamos los montos configurados (ej: si es quincenal, suma los 2 pagos)
-    return movements.fold(0.0, (sum, m) => sum + (m.paymentAmounts ?? []).fold(0.0, (s, e) => s + e));
+    return movements.fold(0.0,
+        (sum, m) => sum + (m.paymentAmounts ?? []).fold(0.0, (s, e) => s + e));
   });
 });
 
@@ -35,7 +40,7 @@ final incomeExecutedTotalProvider = StreamProvider<double>((ref) async* {
   final isar = await IsarService().db;
   final now = ref.watch(nowProvider);
   final range = getCycleDateRange(now, Frequency.monthly);
-  
+
   yield* isar.financialTransactions
       .filter()
       .typeEqualTo(TransactionType.income)
@@ -49,7 +54,7 @@ final incomeFixedExecutedTotalProvider = StreamProvider<double>((ref) async* {
   final isar = await IsarService().db;
   final now = ref.watch(nowProvider);
   final range = getCycleDateRange(now, Frequency.monthly);
-  
+
   yield* isar.financialTransactions
       .filter()
       .typeEqualTo(TransactionType.income)
@@ -61,7 +66,7 @@ final incomeFixedExecutedTotalProvider = StreamProvider<double>((ref) async* {
 
 // Total Histórico (Suma de transacciones de tipo ingreso en el rango seleccionado del historial)
 final incomeHistoryTotalProvider = Provider<AsyncValue<double>>((ref) {
-  // Reutilizamos el provider que ya existe para el historial de gastos, 
+  // Reutilizamos el provider que ya existe para el historial de gastos,
   // pero aquí asumimos que se creará uno similar para ingresos o usamos la lógica directa.
   // Por simplicidad y robustez, consultamos directamente el rango del historial.
   final range = ref.watch(historyDateRangeProvider);
@@ -69,7 +74,8 @@ final incomeHistoryTotalProvider = Provider<AsyncValue<double>>((ref) {
 });
 
 // Helper para historial
-final incomeExecutedInDateRangeProvider = StreamProvider.family<double, DateRange>((ref, range) async* {
+final incomeExecutedInDateRangeProvider =
+    StreamProvider.family<double, DateRange>((ref, range) async* {
   final isar = await IsarService().db;
   yield* isar.financialTransactions
       .filter()
@@ -80,12 +86,17 @@ final incomeExecutedInDateRangeProvider = StreamProvider.family<double, DateRang
 });
 
 // Datos del Gráfico (Cobrado vs Por Cobrar)
-final incomeChartDataProvider = Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
+final incomeChartDataProvider =
+    Provider<AsyncValue<Map<String, ({double total, int color})>>>((ref) {
   final projectedAsync = ref.watch(incomeProjectedTotalProvider);
   final executedAsync = ref.watch(incomeExecutedTotalProvider);
   final fixedExecutedAsync = ref.watch(incomeFixedExecutedTotalProvider);
 
-  if (projectedAsync.isLoading || executedAsync.isLoading || fixedExecutedAsync.isLoading) return const AsyncValue.loading();
+  if (projectedAsync.isLoading ||
+      executedAsync.isLoading ||
+      fixedExecutedAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
 
   final projected = projectedAsync.value ?? 0.0;
   final executed = executedAsync.value ?? 0.0;
@@ -96,8 +107,8 @@ final incomeChartDataProvider = Provider<AsyncValue<Map<String, ({double total, 
   final remaining = (projected - fixedExecuted).clamp(0.0, double.infinity);
 
   return AsyncValue.data({
-    "Cobrado": (total: executed, color: Colors.teal.shade700.toARGB32()),
-    "Por Cobrar": (total: remaining, color: Colors.blueGrey.shade600.toARGB32()),
+    "Cobrado": (total: executed, color: const Color(0xFF05D5AA).toARGB32()),
+    "Por Cobrar": (total: remaining, color: const Color(0xFF48DBFB).toARGB32()),
   });
 });
 
@@ -108,7 +119,8 @@ class IncomeScreen extends ConsumerStatefulWidget {
   ConsumerState<IncomeScreen> createState() => _IncomeScreenState();
 }
 
-class _IncomeScreenState extends ConsumerState<IncomeScreen> with SingleTickerProviderStateMixin {
+class _IncomeScreenState extends ConsumerState<IncomeScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final VoidCallback _tabListener;
 
@@ -146,7 +158,9 @@ class _IncomeScreenState extends ConsumerState<IncomeScreen> with SingleTickerPr
           controller: _tabController,
           tabs: const [
             Tab(text: "Mis Fijos", icon: Icon(FontAwesomeIcons.fileContract)),
-            Tab(text: "Historial", icon: Icon(FontAwesomeIcons.clockRotateLeft)),
+            Tab(
+                text: "Historial",
+                icon: Icon(FontAwesomeIcons.clockRotateLeft)),
           ],
         ),
       ),
@@ -178,22 +192,22 @@ class _IncomeScreenState extends ConsumerState<IncomeScreen> with SingleTickerPr
             child: FadeTransition(opacity: animation, child: child),
           );
         },
-        child: tabIndex == 0 
-        ? FloatingActionButton.extended(
-          key: const ValueKey('fab_income'),
-          onPressed: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              useSafeArea: true,
-              builder: (context) => const AddIncomeModal(),
-            );
-          },
-          label: const Text("Ingreso"),
-          icon: const Icon(FontAwesomeIcons.plus),
-          backgroundColor: Colors.teal,
-        )
-        : const SizedBox.shrink(),
+        child: tabIndex == 0
+            ? FloatingActionButton.extended(
+                key: const ValueKey('fab_income'),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (context) => const AddIncomeModal(),
+                  );
+                },
+                label: const Text("Ingreso"),
+                icon: const Icon(FontAwesomeIcons.plus),
+                backgroundColor: AppColors.of(context).incomeColor,
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }

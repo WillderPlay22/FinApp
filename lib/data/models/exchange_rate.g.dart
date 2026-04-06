@@ -1,0 +1,1128 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'exchange_rate.dart';
+
+// **************************************************************************
+// IsarCollectionGenerator
+// **************************************************************************
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
+extension GetExchangeRateCollection on Isar {
+  IsarCollection<ExchangeRate> get exchangeRates => this.collection();
+}
+
+const ExchangeRateSchema = CollectionSchema(
+  name: r'ExchangeRate',
+  id: 2471902153154867119,
+  properties: {
+    r'date': PropertySchema(
+      id: 0,
+      name: r'date',
+      type: IsarType.dateTime,
+    ),
+    r'fromCurrency': PropertySchema(
+      id: 1,
+      name: r'fromCurrency',
+      type: IsarType.string,
+    ),
+    r'rate': PropertySchema(
+      id: 2,
+      name: r'rate',
+      type: IsarType.double,
+    ),
+    r'source': PropertySchema(
+      id: 3,
+      name: r'source',
+      type: IsarType.string,
+    ),
+    r'toCurrency': PropertySchema(
+      id: 4,
+      name: r'toCurrency',
+      type: IsarType.string,
+    )
+  },
+  estimateSize: _exchangeRateEstimateSize,
+  serialize: _exchangeRateSerialize,
+  deserialize: _exchangeRateDeserialize,
+  deserializeProp: _exchangeRateDeserializeProp,
+  idName: r'id',
+  indexes: {
+    r'date': IndexSchema(
+      id: -7552997827385218417,
+      name: r'date',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'date',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
+  links: {},
+  embeddedSchemas: {},
+  getId: _exchangeRateGetId,
+  getLinks: _exchangeRateGetLinks,
+  attach: _exchangeRateAttach,
+  version: '3.1.0+1',
+);
+
+int _exchangeRateEstimateSize(
+  ExchangeRate object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.fromCurrency.length * 3;
+  bytesCount += 3 + object.source.length * 3;
+  bytesCount += 3 + object.toCurrency.length * 3;
+  return bytesCount;
+}
+
+void _exchangeRateSerialize(
+  ExchangeRate object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeDateTime(offsets[0], object.date);
+  writer.writeString(offsets[1], object.fromCurrency);
+  writer.writeDouble(offsets[2], object.rate);
+  writer.writeString(offsets[3], object.source);
+  writer.writeString(offsets[4], object.toCurrency);
+}
+
+ExchangeRate _exchangeRateDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = ExchangeRate();
+  object.date = reader.readDateTime(offsets[0]);
+  object.fromCurrency = reader.readString(offsets[1]);
+  object.id = id;
+  object.rate = reader.readDouble(offsets[2]);
+  object.source = reader.readString(offsets[3]);
+  object.toCurrency = reader.readString(offsets[4]);
+  return object;
+}
+
+P _exchangeRateDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readDateTime(offset)) as P;
+    case 1:
+      return (reader.readString(offset)) as P;
+    case 2:
+      return (reader.readDouble(offset)) as P;
+    case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _exchangeRateGetId(ExchangeRate object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _exchangeRateGetLinks(ExchangeRate object) {
+  return [];
+}
+
+void _exchangeRateAttach(
+    IsarCollection<dynamic> col, Id id, ExchangeRate object) {
+  object.id = id;
+}
+
+extension ExchangeRateQueryWhereSort
+    on QueryBuilder<ExchangeRate, ExchangeRate, QWhere> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhere> anyDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'date'),
+      );
+    });
+  }
+}
+
+extension ExchangeRateQueryWhere
+    on QueryBuilder<ExchangeRate, ExchangeRate, QWhereClause> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> idEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: id,
+        upper: id,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> idNotEqualTo(
+      Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> idGreaterThan(
+      Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> idLessThan(Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: lowerId,
+        includeLower: includeLower,
+        upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> dateEqualTo(
+      DateTime date) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'date',
+        value: [date],
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> dateNotEqualTo(
+      DateTime date) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [],
+              upper: [date],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [date],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [date],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'date',
+              lower: [],
+              upper: [date],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> dateGreaterThan(
+    DateTime date, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [date],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> dateLessThan(
+    DateTime date, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [],
+        upper: [date],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterWhereClause> dateBetween(
+    DateTime lowerDate,
+    DateTime upperDate, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'date',
+        lower: [lowerDate],
+        includeLower: includeLower,
+        upper: [upperDate],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+}
+
+extension ExchangeRateQueryFilter
+    on QueryBuilder<ExchangeRate, ExchangeRate, QFilterCondition> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> dateEqualTo(
+      DateTime value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'date',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      dateGreaterThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'date',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> dateLessThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'date',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> dateBetween(
+    DateTime lower,
+    DateTime upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'date',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'fromCurrency',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'fromCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'fromCurrency',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fromCurrency',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      fromCurrencyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'fromCurrency',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> idEqualTo(
+      Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> idGreaterThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> idLessThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> rateEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'rate',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      rateGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'rate',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> rateLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'rate',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> rateBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'rate',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> sourceEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> sourceBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'source',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'source',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition> sourceMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'source',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'source',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      sourceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'source',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'toCurrency',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'toCurrency',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'toCurrency',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'toCurrency',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterFilterCondition>
+      toCurrencyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'toCurrency',
+        value: '',
+      ));
+    });
+  }
+}
+
+extension ExchangeRateQueryObject
+    on QueryBuilder<ExchangeRate, ExchangeRate, QFilterCondition> {}
+
+extension ExchangeRateQueryLinks
+    on QueryBuilder<ExchangeRate, ExchangeRate, QFilterCondition> {}
+
+extension ExchangeRateQuerySortBy
+    on QueryBuilder<ExchangeRate, ExchangeRate, QSortBy> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'date', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByFromCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fromCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy>
+      sortByFromCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fromCurrency', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByRate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByRateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortBySource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortBySourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> sortByToCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'toCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy>
+      sortByToCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'toCurrency', Sort.desc);
+    });
+  }
+}
+
+extension ExchangeRateQuerySortThenBy
+    on QueryBuilder<ExchangeRate, ExchangeRate, QSortThenBy> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'date', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByFromCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fromCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy>
+      thenByFromCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fromCurrency', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByRate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByRateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenBySource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenBySourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy> thenByToCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'toCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QAfterSortBy>
+      thenByToCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'toCurrency', Sort.desc);
+    });
+  }
+}
+
+extension ExchangeRateQueryWhereDistinct
+    on QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> {
+  QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> distinctByDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'date');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> distinctByFromCurrency(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'fromCurrency', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> distinctByRate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'rate');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> distinctBySource(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'source', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ExchangeRate, ExchangeRate, QDistinct> distinctByToCurrency(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'toCurrency', caseSensitive: caseSensitive);
+    });
+  }
+}
+
+extension ExchangeRateQueryProperty
+    on QueryBuilder<ExchangeRate, ExchangeRate, QQueryProperty> {
+  QueryBuilder<ExchangeRate, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, DateTime, QQueryOperations> dateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'date');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, String, QQueryOperations> fromCurrencyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'fromCurrency');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, double, QQueryOperations> rateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'rate');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, String, QQueryOperations> sourceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'source');
+    });
+  }
+
+  QueryBuilder<ExchangeRate, String, QQueryOperations> toCurrencyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'toCurrency');
+    });
+  }
+}

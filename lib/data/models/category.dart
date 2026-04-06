@@ -18,15 +18,18 @@ class Category {
   @Enumerated(EnumType.name)
   Frequency? frequency; 
 
-  bool isExpense; 
+  bool isExpense;
+
+  double? budgetLimit;
 
   Category({
     required this.name,
     required this.iconCode,
     required this.colorValue,
-    this.frequency, 
+    this.frequency,
     this.isExpense = true,
+    this.budgetLimit,
   });
-  
+
   Category.empty() : isExpense = true;
 }

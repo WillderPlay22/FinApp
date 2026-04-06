@@ -7,7 +7,9 @@ import '../../../data/models/transaction.dart';
 import '../../../data/models/enums.dart';
 import '../../../date_utils.dart';
 import '../../../logic/providers/time_provider.dart';
+import '../../../logic/providers/currency_providers.dart';
 import '../../shared/icon_mapper.dart';
+import '../../shared/currency_amount_display.dart';
 import '../../../logic/providers/database_providers.dart';
 
 // --- PROVIDERS PARA EL FILTRADO DEL HISTORIAL ---
@@ -164,14 +166,15 @@ class ExpenseHistoryList extends ConsumerWidget {
   }
 }
 
-class _ExpenseHistoryItem extends StatelessWidget {
+class _ExpenseHistoryItem extends ConsumerWidget {
   final FinancialTransaction transaction;
 
   const _ExpenseHistoryItem({required this.transaction});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
+    final isMultiCurrency = ref.watch(isMultiCurrencyEnabledProvider);
 
     // Determinar el ícono y color correctos.
     // Para deudas, usamos valores fijos. Para otros, usamos los de la transacción.
@@ -246,11 +249,21 @@ class _ExpenseHistoryItem extends StatelessWidget {
             ),
           ),
 
-          // Monto a la derecha
-          Text(
-            "- \$${transaction.amount.toStringAsFixed(2)}",
-            style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.red, fontSize: 16),
-          ),
+          // Monto a la derecha (con soporte dual moneda)
+          if (isMultiCurrency && transaction.currencyCode != null)
+            CurrencyAmountDisplay(
+              amount: transaction.amount,
+              currencyCode: transaction.currencyCode,
+              textAlign: TextAlign.end,
+              primaryStyle: const TextStyle(fontWeight: FontWeight.w900, color: Colors.red, fontSize: 16),
+              secondaryStyle: TextStyle(fontSize: 10, color: colors.outline),
+              prefix: '- ',
+            )
+          else
+            Text(
+              "- \$${transaction.amount.toStringAsFixed(2)}",
+              style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.red, fontSize: 16),
+            ),
         ],
       ),
     );

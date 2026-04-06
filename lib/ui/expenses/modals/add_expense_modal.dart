@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../data/models/category.dart';
 import '../../../data/models/expense.dart';
-import '../../../data/models/enums.dart'; 
+import '../../../data/models/enums.dart';
 import '../../../logic/providers/database_providers.dart';
+import '../../../logic/providers/currency_providers.dart';
 import '../../shared/icon_mapper.dart';
+import '../../shared/currency_input_field.dart';
 import 'create_category_modal.dart';
 
 class AddExpenseModal extends ConsumerStatefulWidget {
@@ -33,11 +35,13 @@ class AddExpenseModal extends ConsumerStatefulWidget {
 class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
-  
+
   bool _isFixedExpense = false;
   DateTime _selectedDate = DateTime.now();
   Category? _selectedCategory;
+  Frequency _selectedFrequency = Frequency.monthly;
   bool _isFormValid = false;
+  String _selectedCurrency = 'USD';
 
   @override
   void initState() {
@@ -49,6 +53,10 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       _isFixedExpense = e.isRecurring;
       _selectedDate = e.date;
       _selectedCategory = e.category.value;
+      _selectedFrequency = e.frequency;
+      if (e.currencyCode != null) {
+        _selectedCurrency = e.currencyCode!;
+      }
     } else {
       // Si venimos pre-seleccionados (desde el detalle de categoría)
       if (widget.preSelectedCategory != null) {
@@ -93,7 +101,8 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
         color: colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -124,18 +133,16 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
              const Gap(20),
           ],
 
-          // 2. MONTO
-          TextField(
+          // 2. MONTO (con soporte multi-moneda)
+          CurrencyInputField(
             controller: _amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Color(0xFFE74C3C)),
-            decoration: InputDecoration(
-              hintText: widget.maxAmount != null ? "Máx ${widget.maxAmount}" : "0.00",
-              prefixIcon: const Icon(Icons.attach_money, color: Color(0xFFE74C3C)),
-              border: InputBorder.none,
-              hintStyle: TextStyle(color: colors.outline.withAlpha((255 * 0.3).round())),
-            ),
+            hintText: "0.00",
+            maxAmount: widget.maxAmount,
+            iconColor: const Color(0xFFE74C3C),
+            initialCurrency: _selectedCurrency,
+            onCurrencyChanged: (currency) {
+              setState(() => _selectedCurrency = currency);
+            },
           ),
 
           const Gap(10),
@@ -155,15 +162,19 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
 
           const Gap(20),
 
-          // 4. SI NO ES FIJO, MOSTRAMOS FECHA Y CATEGORÍA ABAJO
+          // 4. SI ES FIJO, MOSTRAMOS SELECTOR DE FRECUENCIA
+          if (_isFixedExpense) ...[
+            _buildFrequencySelector(colors),
+            const Gap(20),
+          ],
+
+          // 5. SI NO ES FIJO, MOSTRAMOS FECHA Y CATEGORÍA ABAJO
           if (!_isFixedExpense) ...[
             _buildDatePicker(colors),
             const Gap(20),
             _buildCategorySelector(colors),
             const Gap(20),
           ],
-          
-          // NOTA: Si es fijo, ocultamos fecha y frecuencia, ya que las hereda de la Categoría.
 
           // BOTÓN GUARDAR
           SizedBox(
@@ -192,6 +203,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
           const Gap(20),
         ],
       ),
+      ),
     );
   }
 
@@ -212,6 +224,32 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
     );
   }
   
+  Widget _buildFrequencySelector(ColorScheme colors) {
+    return Row(
+      children: [
+        Text("Frecuencia:", style: TextStyle(fontWeight: FontWeight.bold, color: colors.outline)),
+        const Gap(12),
+        Expanded(
+          child: DropdownButtonFormField<Frequency>(
+            value: _selectedFrequency,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
+            ),
+            items: const [
+              DropdownMenuItem(value: Frequency.weekly, child: Text("Semanal")),
+              DropdownMenuItem(value: Frequency.biweekly, child: Text("Quincenal")),
+              DropdownMenuItem(value: Frequency.monthly, child: Text("Mensual")),
+            ],
+            onChanged: (v) => setState(() => _selectedFrequency = v!),
+          ),
+        ),
+      ],
+    );
+  }
+
    Widget _buildDatePicker(ColorScheme colors) {
     return GestureDetector(
       onTap: _pickDate,
@@ -264,9 +302,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                   final category = categories[index];
                   final isSelected = _selectedCategory?.id == category.id;
                   
-                  // Si estamos en modo Fijo, mostrar la frecuencia en la tarjeta
-                  final showFreq = _isFixedExpense && category.frequency != null;
-
                   return GestureDetector(
                     onTap: () {
                       setState(() => _selectedCategory = category);
@@ -289,8 +324,6 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
                         ),
                         const Gap(5),
                         Text(category.name, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                        if (showFreq) 
-                          Text(category.frequency.toString().split('.').last, style: const TextStyle(fontSize: 8, color: Colors.blueGrey)),
                       ],
                     ),
                   );
@@ -322,7 +355,7 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
     );
   }
 
-  void _saveExpense() {
+  void _saveExpense() async {
     if (_amountController.text.isEmpty || _noteController.text.isEmpty || _selectedCategory == null) return;
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) return;
@@ -332,6 +365,16 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       return;
     }
 
+    // Determinar si multi-moneda esta habilitado
+    final isMultiCurrency = ref.read(isMultiCurrencyEnabledProvider);
+
+    // Obtener tasa de cambio actual si multi-moneda está habilitado
+    double? currentRate;
+    if (isMultiCurrency) {
+      final rateData = await ref.read(currentExchangeRateProvider.future);
+      currentRate = rateData?.rate;
+    }
+
     ref.read(expenseDaoProvider).saveExpense(
       id: widget.expenseToEdit?.id,
       title: _noteController.text,
@@ -339,14 +382,16 @@ class _AddExpenseModalState extends ConsumerState<AddExpenseModal> {
       date: _selectedDate,
       category: _selectedCategory!,
       isFixed: _isFixedExpense,
-      // Si es fijo, usamos la frecuencia de la categoría, si no, mensual por defecto
-      frequency: _isFixedExpense ? (_selectedCategory!.frequency ?? Frequency.monthly) : Frequency.monthly,
+      frequency: _isFixedExpense ? _selectedFrequency : Frequency.monthly,
+      currencyCode: isMultiCurrency ? _selectedCurrency : null,
+      exchangeRate: currentRate,
     );
 
     if (widget.onExpenseSaved != null) {
       widget.onExpenseSaved!(amount);
     }
 
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guardado correctamente")));
   }

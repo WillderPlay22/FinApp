@@ -22,64 +22,69 @@ const DebtSchema = CollectionSchema(
       name: r'creationDate',
       type: IsarType.dateTime,
     ),
-    r'customDays': PropertySchema(
+    r'currencyCode': PropertySchema(
       id: 1,
+      name: r'currencyCode',
+      type: IsarType.string,
+    ),
+    r'customDays': PropertySchema(
+      id: 2,
       name: r'customDays',
       type: IsarType.long,
     ),
     r'dueDate': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'dueDate',
       type: IsarType.dateTime,
     ),
     r'frequency': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'frequency',
       type: IsarType.byte,
       enumMap: _DebtfrequencyEnumValueMap,
     ),
     r'initialPayment': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'initialPayment',
       type: IsarType.double,
     ),
     r'installmentAmount': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'installmentAmount',
       type: IsarType.double,
     ),
     r'installmentCount': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'installmentCount',
       type: IsarType.long,
     ),
     r'isPaidOff': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isPaidOff',
       type: IsarType.bool,
     ),
     r'nextPaymentDate': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'nextPaymentDate',
       type: IsarType.dateTime,
     ),
     r'originalInstallmentAmount': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'originalInstallmentAmount',
       type: IsarType.double,
     ),
     r'remainingAmount': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'remainingAmount',
       type: IsarType.double,
     ),
     r'title': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'title',
       type: IsarType.string,
     ),
     r'totalAmount': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'totalAmount',
       type: IsarType.double,
     )
@@ -104,6 +109,12 @@ int _debtEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.currencyCode;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -115,18 +126,19 @@ void _debtSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.creationDate);
-  writer.writeLong(offsets[1], object.customDays);
-  writer.writeDateTime(offsets[2], object.dueDate);
-  writer.writeByte(offsets[3], object.frequency.index);
-  writer.writeDouble(offsets[4], object.initialPayment);
-  writer.writeDouble(offsets[5], object.installmentAmount);
-  writer.writeLong(offsets[6], object.installmentCount);
-  writer.writeBool(offsets[7], object.isPaidOff);
-  writer.writeDateTime(offsets[8], object.nextPaymentDate);
-  writer.writeDouble(offsets[9], object.originalInstallmentAmount);
-  writer.writeDouble(offsets[10], object.remainingAmount);
-  writer.writeString(offsets[11], object.title);
-  writer.writeDouble(offsets[12], object.totalAmount);
+  writer.writeString(offsets[1], object.currencyCode);
+  writer.writeLong(offsets[2], object.customDays);
+  writer.writeDateTime(offsets[3], object.dueDate);
+  writer.writeByte(offsets[4], object.frequency.index);
+  writer.writeDouble(offsets[5], object.initialPayment);
+  writer.writeDouble(offsets[6], object.installmentAmount);
+  writer.writeLong(offsets[7], object.installmentCount);
+  writer.writeBool(offsets[8], object.isPaidOff);
+  writer.writeDateTime(offsets[9], object.nextPaymentDate);
+  writer.writeDouble(offsets[10], object.originalInstallmentAmount);
+  writer.writeDouble(offsets[11], object.remainingAmount);
+  writer.writeString(offsets[12], object.title);
+  writer.writeDouble(offsets[13], object.totalAmount);
 }
 
 Debt _debtDeserialize(
@@ -137,21 +149,22 @@ Debt _debtDeserialize(
 ) {
   final object = Debt();
   object.creationDate = reader.readDateTime(offsets[0]);
-  object.customDays = reader.readLongOrNull(offsets[1]);
-  object.dueDate = reader.readDateTimeOrNull(offsets[2]);
+  object.currencyCode = reader.readStringOrNull(offsets[1]);
+  object.customDays = reader.readLongOrNull(offsets[2]);
+  object.dueDate = reader.readDateTimeOrNull(offsets[3]);
   object.frequency =
-      _DebtfrequencyValueEnumMap[reader.readByteOrNull(offsets[3])] ??
+      _DebtfrequencyValueEnumMap[reader.readByteOrNull(offsets[4])] ??
           DebtFrequency.daily;
   object.id = id;
-  object.initialPayment = reader.readDouble(offsets[4]);
-  object.installmentAmount = reader.readDouble(offsets[5]);
-  object.installmentCount = reader.readLong(offsets[6]);
-  object.isPaidOff = reader.readBool(offsets[7]);
-  object.nextPaymentDate = reader.readDateTimeOrNull(offsets[8]);
-  object.originalInstallmentAmount = reader.readDoubleOrNull(offsets[9]);
-  object.remainingAmount = reader.readDouble(offsets[10]);
-  object.title = reader.readString(offsets[11]);
-  object.totalAmount = reader.readDouble(offsets[12]);
+  object.initialPayment = reader.readDouble(offsets[5]);
+  object.installmentAmount = reader.readDouble(offsets[6]);
+  object.installmentCount = reader.readLong(offsets[7]);
+  object.isPaidOff = reader.readBool(offsets[8]);
+  object.nextPaymentDate = reader.readDateTimeOrNull(offsets[9]);
+  object.originalInstallmentAmount = reader.readDoubleOrNull(offsets[10]);
+  object.remainingAmount = reader.readDouble(offsets[11]);
+  object.title = reader.readString(offsets[12]);
+  object.totalAmount = reader.readDouble(offsets[13]);
   return object;
 }
 
@@ -165,29 +178,31 @@ P _debtDeserializeProp<P>(
     case 0:
       return (reader.readDateTime(offset)) as P;
     case 1:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 3:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 4:
       return (_DebtfrequencyValueEnumMap[reader.readByteOrNull(offset)] ??
           DebtFrequency.daily) as P;
-    case 4:
-      return (reader.readDouble(offset)) as P;
     case 5:
       return (reader.readDouble(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
-    case 7:
-      return (reader.readBool(offset)) as P;
-    case 8:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 9:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 10:
       return (reader.readDouble(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readBool(offset)) as P;
+    case 9:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 10:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 11:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -348,6 +363,152 @@ extension DebtQueryFilter on QueryBuilder<Debt, Debt, QFilterCondition> {
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currencyCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'currencyCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterFilterCondition> currencyCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'currencyCode',
+        value: '',
       ));
     });
   }
@@ -1204,6 +1365,18 @@ extension DebtQuerySortBy on QueryBuilder<Debt, Debt, QSortBy> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QAfterSortBy> sortByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterSortBy> sortByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<Debt, Debt, QAfterSortBy> sortByCustomDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'customDays', Sort.asc);
@@ -1359,6 +1532,18 @@ extension DebtQuerySortThenBy on QueryBuilder<Debt, Debt, QSortThenBy> {
   QueryBuilder<Debt, Debt, QAfterSortBy> thenByCreationDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'creationDate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterSortBy> thenByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Debt, Debt, QAfterSortBy> thenByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
     });
   }
 
@@ -1526,6 +1711,13 @@ extension DebtQueryWhereDistinct on QueryBuilder<Debt, Debt, QDistinct> {
     });
   }
 
+  QueryBuilder<Debt, Debt, QDistinct> distinctByCurrencyCode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currencyCode', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Debt, Debt, QDistinct> distinctByCustomDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'customDays');
@@ -1610,6 +1802,12 @@ extension DebtQueryProperty on QueryBuilder<Debt, Debt, QQueryProperty> {
   QueryBuilder<Debt, DateTime, QQueryOperations> creationDateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'creationDate');
+    });
+  }
+
+  QueryBuilder<Debt, String?, QQueryOperations> currencyCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currencyCode');
     });
   }
 

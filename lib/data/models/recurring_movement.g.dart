@@ -22,49 +22,59 @@ const RecurringMovementSchema = CollectionSchema(
       name: r'accumulatedAmount',
       type: IsarType.double,
     ),
-    r'frequency': PropertySchema(
+    r'createdAt': PropertySchema(
       id: 1,
+      name: r'createdAt',
+      type: IsarType.dateTime,
+    ),
+    r'currencyCode': PropertySchema(
+      id: 2,
+      name: r'currencyCode',
+      type: IsarType.string,
+    ),
+    r'frequency': PropertySchema(
+      id: 3,
       name: r'frequency',
       type: IsarType.string,
       enumMap: _RecurringMovementfrequencyEnumValueMap,
     ),
     r'isVariableDaily': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'isVariableDaily',
       type: IsarType.bool,
     ),
     r'nextPaymentDate': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'nextPaymentDate',
       type: IsarType.dateTime,
     ),
     r'paymentAmounts': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'paymentAmounts',
       type: IsarType.doubleList,
     ),
     r'paymentDays': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'paymentDays',
       type: IsarType.longList,
     ),
     r'remainingInstallments': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'remainingInstallments',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'title',
       type: IsarType.string,
     ),
     r'totalEntries': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'totalEntries',
       type: IsarType.long,
     ),
     r'type': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'type',
       type: IsarType.string,
       enumMap: _RecurringMovementtypeEnumValueMap,
@@ -90,6 +100,12 @@ int _recurringMovementEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.currencyCode;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.frequency.name.length * 3;
   {
     final value = object.paymentAmounts;
@@ -115,15 +131,17 @@ void _recurringMovementSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.accumulatedAmount);
-  writer.writeString(offsets[1], object.frequency.name);
-  writer.writeBool(offsets[2], object.isVariableDaily);
-  writer.writeDateTime(offsets[3], object.nextPaymentDate);
-  writer.writeDoubleList(offsets[4], object.paymentAmounts);
-  writer.writeLongList(offsets[5], object.paymentDays);
-  writer.writeLong(offsets[6], object.remainingInstallments);
-  writer.writeString(offsets[7], object.title);
-  writer.writeLong(offsets[8], object.totalEntries);
-  writer.writeString(offsets[9], object.type.name);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeString(offsets[2], object.currencyCode);
+  writer.writeString(offsets[3], object.frequency.name);
+  writer.writeBool(offsets[4], object.isVariableDaily);
+  writer.writeDateTime(offsets[5], object.nextPaymentDate);
+  writer.writeDoubleList(offsets[6], object.paymentAmounts);
+  writer.writeLongList(offsets[7], object.paymentDays);
+  writer.writeLong(offsets[8], object.remainingInstallments);
+  writer.writeString(offsets[9], object.title);
+  writer.writeLong(offsets[10], object.totalEntries);
+  writer.writeString(offsets[11], object.type.name);
 }
 
 RecurringMovement _recurringMovementDeserialize(
@@ -134,20 +152,22 @@ RecurringMovement _recurringMovementDeserialize(
 ) {
   final object = RecurringMovement();
   object.accumulatedAmount = reader.readDouble(offsets[0]);
+  object.createdAt = reader.readDateTimeOrNull(offsets[1]);
+  object.currencyCode = reader.readStringOrNull(offsets[2]);
   object.frequency = _RecurringMovementfrequencyValueEnumMap[
-          reader.readStringOrNull(offsets[1])] ??
+          reader.readStringOrNull(offsets[3])] ??
       Frequency.none;
   object.id = id;
-  object.isVariableDaily = reader.readBool(offsets[2]);
-  object.nextPaymentDate = reader.readDateTime(offsets[3]);
-  object.paymentAmounts = reader.readDoubleList(offsets[4]);
-  object.paymentDays = reader.readLongList(offsets[5]);
-  object.remainingInstallments = reader.readLongOrNull(offsets[6]);
-  object.title = reader.readString(offsets[7]);
-  object.totalEntries = reader.readLong(offsets[8]);
-  object.type =
-      _RecurringMovementtypeValueEnumMap[reader.readStringOrNull(offsets[9])] ??
-          TransactionType.income;
+  object.isVariableDaily = reader.readBool(offsets[4]);
+  object.nextPaymentDate = reader.readDateTime(offsets[5]);
+  object.paymentAmounts = reader.readDoubleList(offsets[6]);
+  object.paymentDays = reader.readLongList(offsets[7]);
+  object.remainingInstallments = reader.readLongOrNull(offsets[8]);
+  object.title = reader.readString(offsets[9]);
+  object.totalEntries = reader.readLong(offsets[10]);
+  object.type = _RecurringMovementtypeValueEnumMap[
+          reader.readStringOrNull(offsets[11])] ??
+      TransactionType.income;
   return object;
 }
 
@@ -161,24 +181,28 @@ P _recurringMovementDeserializeProp<P>(
     case 0:
       return (reader.readDouble(offset)) as P;
     case 1:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 2:
+      return (reader.readStringOrNull(offset)) as P;
+    case 3:
       return (_RecurringMovementfrequencyValueEnumMap[
               reader.readStringOrNull(offset)] ??
           Frequency.none) as P;
-    case 2:
-      return (reader.readBool(offset)) as P;
-    case 3:
-      return (reader.readDateTime(offset)) as P;
     case 4:
-      return (reader.readDoubleList(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 5:
-      return (reader.readLongList(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 6:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDoubleList(offset)) as P;
     case 7:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongList(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 9:
+      return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
       return (_RecurringMovementtypeValueEnumMap[
               reader.readStringOrNull(offset)] ??
           TransactionType.income) as P;
@@ -372,6 +396,234 @@ extension RecurringMovementQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'createdAt',
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'createdAt',
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      createdAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'createdAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currencyCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'currencyCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterFilterCondition>
+      currencyCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'currencyCode',
+        value: '',
       ));
     });
   }
@@ -1396,6 +1648,34 @@ extension RecurringMovementQuerySortBy
   }
 
   QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      sortByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      sortByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      sortByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      sortByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
       sortByFrequency() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'frequency', Sort.asc);
@@ -1507,6 +1787,34 @@ extension RecurringMovementQuerySortThenBy
       thenByAccumulatedAmountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'accumulatedAmount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      thenByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      thenByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      thenByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QAfterSortBy>
+      thenByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
     });
   }
 
@@ -1632,6 +1940,20 @@ extension RecurringMovementQueryWhereDistinct
   }
 
   QueryBuilder<RecurringMovement, RecurringMovement, QDistinct>
+      distinctByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QDistinct>
+      distinctByCurrencyCode({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currencyCode', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<RecurringMovement, RecurringMovement, QDistinct>
       distinctByFrequency({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'frequency', caseSensitive: caseSensitive);
@@ -1707,6 +2029,20 @@ extension RecurringMovementQueryProperty
       accumulatedAmountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'accumulatedAmount');
+    });
+  }
+
+  QueryBuilder<RecurringMovement, DateTime?, QQueryOperations>
+      createdAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<RecurringMovement, String?, QQueryOperations>
+      currencyCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currencyCode');
     });
   }
 

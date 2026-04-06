@@ -32,12 +32,16 @@ dependencies:
   google_fonts: ^6.1.0
   gap: ^3.0.0
 
+  # --- HTTP ---
+  http: ^1.2.1
+
   # --- UTILIDADES Y NOTIFICACIONES ---
   uuid: ^4.3.3
   
   # Versión 17.0.0 (Correcta y compatible)
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.2
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:
@@ -47,9 +51,19 @@ dev_dependencies:
   build_runner: ^2.4.8
   riverpod_generator: ^2.4.0
   isar_generator: ^3.1.0+1
-  
+
   # --- LINTERS ---
   flutter_lints: ^3.0.0
+
+  # --- ICONO DE LA APP ---
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#283593"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 # ⬇️ ESTA SECCIÓN SOLUCIONA EL ERROR DEL SDK 36
 # Obligamos a usar una versión vieja de path_provider_android 

@@ -11,6 +11,7 @@ import 'widgets/expense_history_list.dart';
 import 'widgets/expenses_summary_header.dart';
 import 'widgets/debts_list.dart'; // Importar la nueva pantalla de deudas
 import 'widgets/fixed_expenses_list.dart';
+import '../../config/theme/app_colors.dart';
 
 // --- PROVIDERS ESPECÍFICOS PARA ESTA PANTALLA ---
 
@@ -21,28 +22,8 @@ import 'widgets/fixed_expenses_list.dart';
 final _categorizedFixedProjectionProvider =
     StreamProvider<Map<String, ({double total, int color})>>((ref) {
   final expenseDao = ref.watch(expenseDaoProvider);
-
-  // Combine triggers: We want to rebuild if Expenses change OR Categories change.
-  // Since we can't easily combine streams in the return, we listen to categories
-  // to invalidate/rebuild this provider, or use a combined stream.
-
-  // Trick: Watch categories stream. Value presence forces rebuild on change.
-  ref.watch(categoryMapProvider); // We'll create this or use a raw stream
-
-  return expenseDao.watchFixedExpenses().map((fixedExpenses) {
-    // 2. Transformamos la lista en el mapa que necesita el gráfico.
-    final Map<String, ({double total, int color})> projectionMap = {};
-    for (final expense in fixedExpenses) {
-      final category = expense.category.value;
-      if (category == null) continue;
-      final monthlyAmount = expenseDao.getMonthlyAmount(expense);
-      final current = projectionMap[category.name] ??
-          (total: 0.0, color: category.colorValue);
-      projectionMap[category.name] =
-          (total: current.total + monthlyAmount, color: category.colorValue);
-    }
-    return projectionMap;
-  });
+  ref.watch(categoryMapProvider);
+  return expenseDao.watchCategorizedFixedProjection();
 });
 
 // Helper provider to watch categories (forces rebuild on change)
@@ -179,12 +160,12 @@ final debtChartDataProvider =
   return AsyncValue.data({
     "Pagado": (
       total: paid,
-      color: const Color(0xFF00B894).toARGB32()
-    ), // Esmeralda
+      color: const Color(0xFF05D5AA).toARGB32() // Usar color de éxito
+    ),
     "Pendiente": (
       total: pending,
-      color: const Color(0xFFD35400).toARGB32()
-    ), // Terracota
+      color: const Color(0xFFFF9F43).toARGB32() // Usar color de deuda
+    ),
   });
 });
 
@@ -302,6 +283,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
   }
 
   Widget _buildFabForTab(int index) {
+    final appColors = AppColors.of(context);
+
     switch (index) {
       case 0: // Pestaña "Categorías"
         return FloatingActionButton.extended(
@@ -314,7 +297,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
           ),
           label: const Text("Gasto"),
           icon: const Icon(Icons.add),
-          backgroundColor: const Color(0xFFE74C3C), // Coral
+          backgroundColor: appColors.expenseColor,
         );
       case 1: // Pestaña "Deudas"
         return FloatingActionButton.extended(
@@ -329,11 +312,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
           },
           label: const Text("Deuda"),
           icon: const Icon(Icons.add),
-          backgroundColor: const Color(0xFFD35400), // Terracota
+          backgroundColor: appColors.debtColor,
         );
       case 2: // Pestaña "Historial"
       default:
-        // Devuelve un widget vacío para que el botón desaparezca.
         return const SizedBox.shrink(key: ValueKey('fab_empty'));
     }
   }

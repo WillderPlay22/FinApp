@@ -28,6 +28,13 @@ class RecurringMovement {
   int totalEntries = 0;         
 
   // --- LÓGICA DE DEUDAS / PROYECCIÓN ---
-  late DateTime nextPaymentDate; 
-  int? remainingInstallments; 
+  late DateTime nextPaymentDate;
+  int? remainingInstallments;
+
+  // Fecha de creación del ingreso (para saber desde cuándo buscar pagos pendientes)
+  DateTime? createdAt;
+
+  // --- MULTI-MONEDA ---
+  /// Código de moneda de los montos (null = moneda de referencia para retrocompatibilidad).
+  String? currencyCode;
 }

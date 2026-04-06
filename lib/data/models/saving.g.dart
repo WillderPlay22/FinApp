@@ -22,44 +22,49 @@ const SavingSchema = CollectionSchema(
       name: r'colorValue',
       type: IsarType.long,
     ),
-    r'currentAmount': PropertySchema(
+    r'currencyCode': PropertySchema(
       id: 1,
+      name: r'currencyCode',
+      type: IsarType.string,
+    ),
+    r'currentAmount': PropertySchema(
+      id: 2,
       name: r'currentAmount',
       type: IsarType.double,
     ),
     r'fixedAmount': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'fixedAmount',
       type: IsarType.double,
     ),
     r'iconCode': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'iconCode',
       type: IsarType.long,
     ),
     r'method': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'method',
       type: IsarType.byte,
       enumMap: _SavingmethodEnumValueMap,
     ),
     r'name': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'name',
       type: IsarType.string,
     ),
     r'percentage': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'percentage',
       type: IsarType.double,
     ),
     r'targetAmount': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'targetAmount',
       type: IsarType.double,
     ),
     r'type': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'type',
       type: IsarType.byte,
       enumMap: _SavingtypeEnumValueMap,
@@ -85,6 +90,12 @@ int _savingEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.currencyCode;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.name.length * 3;
   return bytesCount;
 }
@@ -96,14 +107,15 @@ void _savingSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.colorValue);
-  writer.writeDouble(offsets[1], object.currentAmount);
-  writer.writeDouble(offsets[2], object.fixedAmount);
-  writer.writeLong(offsets[3], object.iconCode);
-  writer.writeByte(offsets[4], object.method.index);
-  writer.writeString(offsets[5], object.name);
-  writer.writeDouble(offsets[6], object.percentage);
-  writer.writeDouble(offsets[7], object.targetAmount);
-  writer.writeByte(offsets[8], object.type.index);
+  writer.writeString(offsets[1], object.currencyCode);
+  writer.writeDouble(offsets[2], object.currentAmount);
+  writer.writeDouble(offsets[3], object.fixedAmount);
+  writer.writeLong(offsets[4], object.iconCode);
+  writer.writeByte(offsets[5], object.method.index);
+  writer.writeString(offsets[6], object.name);
+  writer.writeDouble(offsets[7], object.percentage);
+  writer.writeDouble(offsets[8], object.targetAmount);
+  writer.writeByte(offsets[9], object.type.index);
 }
 
 Saving _savingDeserialize(
@@ -114,17 +126,18 @@ Saving _savingDeserialize(
 ) {
   final object = Saving();
   object.colorValue = reader.readLong(offsets[0]);
-  object.currentAmount = reader.readDouble(offsets[1]);
-  object.fixedAmount = reader.readDoubleOrNull(offsets[2]);
-  object.iconCode = reader.readLong(offsets[3]);
+  object.currencyCode = reader.readStringOrNull(offsets[1]);
+  object.currentAmount = reader.readDouble(offsets[2]);
+  object.fixedAmount = reader.readDoubleOrNull(offsets[3]);
+  object.iconCode = reader.readLong(offsets[4]);
   object.id = id;
   object.method =
-      _SavingmethodValueEnumMap[reader.readByteOrNull(offsets[4])] ??
+      _SavingmethodValueEnumMap[reader.readByteOrNull(offsets[5])] ??
           SavingMethod.fixed;
-  object.name = reader.readString(offsets[5]);
-  object.percentage = reader.readDoubleOrNull(offsets[6]);
-  object.targetAmount = reader.readDoubleOrNull(offsets[7]);
-  object.type = _SavingtypeValueEnumMap[reader.readByteOrNull(offsets[8])] ??
+  object.name = reader.readString(offsets[6]);
+  object.percentage = reader.readDoubleOrNull(offsets[7]);
+  object.targetAmount = reader.readDoubleOrNull(offsets[8]);
+  object.type = _SavingtypeValueEnumMap[reader.readByteOrNull(offsets[9])] ??
       SavingType.goal;
   return object;
 }
@@ -139,21 +152,23 @@ P _savingDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 3:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
       return (_SavingmethodValueEnumMap[reader.readByteOrNull(offset)] ??
           SavingMethod.fixed) as P;
-    case 5:
-      return (reader.readString(offset)) as P;
     case 6:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 7:
       return (reader.readDoubleOrNull(offset)) as P;
     case 8:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 9:
       return (_SavingtypeValueEnumMap[reader.readByteOrNull(offset)] ??
           SavingType.goal) as P;
     default:
@@ -315,6 +330,152 @@ extension SavingQueryFilter on QueryBuilder<Saving, Saving, QFilterCondition> {
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currencyCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'currencyCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterFilterCondition> currencyCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'currencyCode',
+        value: '',
       ));
     });
   }
@@ -973,6 +1134,18 @@ extension SavingQuerySortBy on QueryBuilder<Saving, Saving, QSortBy> {
     });
   }
 
+  QueryBuilder<Saving, Saving, QAfterSortBy> sortByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterSortBy> sortByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<Saving, Saving, QAfterSortBy> sortByCurrentAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'currentAmount', Sort.asc);
@@ -1080,6 +1253,18 @@ extension SavingQuerySortThenBy on QueryBuilder<Saving, Saving, QSortThenBy> {
   QueryBuilder<Saving, Saving, QAfterSortBy> thenByColorValueDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterSortBy> thenByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Saving, Saving, QAfterSortBy> thenByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
     });
   }
 
@@ -1199,6 +1384,13 @@ extension SavingQueryWhereDistinct on QueryBuilder<Saving, Saving, QDistinct> {
     });
   }
 
+  QueryBuilder<Saving, Saving, QDistinct> distinctByCurrencyCode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currencyCode', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Saving, Saving, QDistinct> distinctByCurrentAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'currentAmount');
@@ -1259,6 +1451,12 @@ extension SavingQueryProperty on QueryBuilder<Saving, Saving, QQueryProperty> {
   QueryBuilder<Saving, int, QQueryOperations> colorValueProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'colorValue');
+    });
+  }
+
+  QueryBuilder<Saving, String?, QQueryOperations> currencyCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currencyCode');
     });
   }
 

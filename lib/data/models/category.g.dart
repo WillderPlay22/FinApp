@@ -17,29 +17,34 @@ const CategorySchema = CollectionSchema(
   name: r'Category',
   id: 5751694338128944171,
   properties: {
-    r'colorValue': PropertySchema(
+    r'budgetLimit': PropertySchema(
       id: 0,
+      name: r'budgetLimit',
+      type: IsarType.double,
+    ),
+    r'colorValue': PropertySchema(
+      id: 1,
       name: r'colorValue',
       type: IsarType.long,
     ),
     r'frequency': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'frequency',
       type: IsarType.string,
       enumMap: _CategoryfrequencyEnumValueMap,
     ),
     r'iconCode': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'iconCode',
       type: IsarType.long,
     ),
     r'isExpense': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'isExpense',
       type: IsarType.bool,
     ),
     r'name': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'name',
       type: IsarType.string,
     )
@@ -80,11 +85,12 @@ void _categorySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.colorValue);
-  writer.writeString(offsets[1], object.frequency?.name);
-  writer.writeLong(offsets[2], object.iconCode);
-  writer.writeBool(offsets[3], object.isExpense);
-  writer.writeString(offsets[4], object.name);
+  writer.writeDouble(offsets[0], object.budgetLimit);
+  writer.writeLong(offsets[1], object.colorValue);
+  writer.writeString(offsets[2], object.frequency?.name);
+  writer.writeLong(offsets[3], object.iconCode);
+  writer.writeBool(offsets[4], object.isExpense);
+  writer.writeString(offsets[5], object.name);
 }
 
 Category _categoryDeserialize(
@@ -94,12 +100,13 @@ Category _categoryDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Category(
-    colorValue: reader.readLong(offsets[0]),
+    budgetLimit: reader.readDoubleOrNull(offsets[0]),
+    colorValue: reader.readLong(offsets[1]),
     frequency:
-        _CategoryfrequencyValueEnumMap[reader.readStringOrNull(offsets[1])],
-    iconCode: reader.readLong(offsets[2]),
-    isExpense: reader.readBoolOrNull(offsets[3]) ?? true,
-    name: reader.readString(offsets[4]),
+        _CategoryfrequencyValueEnumMap[reader.readStringOrNull(offsets[2])],
+    iconCode: reader.readLong(offsets[3]),
+    isExpense: reader.readBoolOrNull(offsets[4]) ?? true,
+    name: reader.readString(offsets[5]),
   );
   object.id = id;
   return object;
@@ -113,15 +120,17 @@ P _categoryDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 1:
+      return (reader.readLong(offset)) as P;
+    case 2:
       return (_CategoryfrequencyValueEnumMap[reader.readStringOrNull(offset)])
           as P;
-    case 2:
-      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readBoolOrNull(offset) ?? true) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
+      return (reader.readBoolOrNull(offset) ?? true) as P;
+    case 5:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -234,6 +243,86 @@ extension CategoryQueryWhere on QueryBuilder<Category, Category, QWhereClause> {
 
 extension CategoryQueryFilter
     on QueryBuilder<Category, Category, QFilterCondition> {
+  QueryBuilder<Category, Category, QAfterFilterCondition> budgetLimitIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'budgetLimit',
+      ));
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition>
+      budgetLimitIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'budgetLimit',
+      ));
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> budgetLimitEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'budgetLimit',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition>
+      budgetLimitGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'budgetLimit',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> budgetLimitLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'budgetLimit',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> budgetLimitBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'budgetLimit',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterFilterCondition> colorValueEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -687,6 +776,18 @@ extension CategoryQueryLinks
     on QueryBuilder<Category, Category, QFilterCondition> {}
 
 extension CategoryQuerySortBy on QueryBuilder<Category, Category, QSortBy> {
+  QueryBuilder<Category, Category, QAfterSortBy> sortByBudgetLimit() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'budgetLimit', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> sortByBudgetLimitDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'budgetLimit', Sort.desc);
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterSortBy> sortByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.asc);
@@ -750,6 +851,18 @@ extension CategoryQuerySortBy on QueryBuilder<Category, Category, QSortBy> {
 
 extension CategoryQuerySortThenBy
     on QueryBuilder<Category, Category, QSortThenBy> {
+  QueryBuilder<Category, Category, QAfterSortBy> thenByBudgetLimit() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'budgetLimit', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> thenByBudgetLimitDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'budgetLimit', Sort.desc);
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterSortBy> thenByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.asc);
@@ -825,6 +938,12 @@ extension CategoryQuerySortThenBy
 
 extension CategoryQueryWhereDistinct
     on QueryBuilder<Category, Category, QDistinct> {
+  QueryBuilder<Category, Category, QDistinct> distinctByBudgetLimit() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'budgetLimit');
+    });
+  }
+
   QueryBuilder<Category, Category, QDistinct> distinctByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'colorValue');
@@ -863,6 +982,12 @@ extension CategoryQueryProperty
   QueryBuilder<Category, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Category, double?, QQueryOperations> budgetLimitProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'budgetLimit');
     });
   }
 

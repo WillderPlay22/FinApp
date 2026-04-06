@@ -8,7 +8,11 @@ import '../../../data/models/enums.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/recurring_movement.dart';
 import '../../../logic/providers/database_providers.dart';
-// ✅ IMPORTANTE: Conexión con notificaciones
+import '../../../logic/providers/currency_providers.dart';
+import '../../shared/currency_input_field.dart';
+import '../../shared/amount_input_formatter.dart';
+import '../../../logic/providers/decimal_separator_provider.dart';
+// Conexion con notificaciones
 import '../../../logic/services/notification_service.dart';
 
 class AddIncomeModal extends ConsumerStatefulWidget {
@@ -36,6 +40,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
       TextEditingController();
   bool _isDailyVariable = false;
   bool _isFormValid = false;
+  String _selectedCurrency = 'USD';
+  String _decimalSep = '.';
 
   @override
   void initState() {
@@ -74,6 +80,7 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
 
   @override
   Widget build(BuildContext context) {
+    _decimalSep = ref.watch(decimalSeparatorProvider);
     final colors = Theme.of(context).colorScheme;
     final textStyles = Theme.of(context).textTheme;
 
@@ -180,28 +187,30 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
 
         if (_selectedFrequency == Frequency.biweekly) {
           paymentDays = [15, -1];
-          final m15 = double.tryParse(_amount15Controller.text) ?? 0;
-          final mLast = double.tryParse(_amountLastController.text) ?? 0;
+          final m15 = parseAmount(_amount15Controller.text, _decimalSep);
+          final mLast = parseAmount(_amountLastController.text, _decimalSep);
           paymentAmounts = [m15, mLast];
         } else if (_selectedFrequency == Frequency.monthly) {
           paymentDays = [_selectedDayOfMonth];
           paymentAmounts = [
-            double.tryParse(_recurringAmountController.text) ?? 0
+            parseAmount(_recurringAmountController.text, _decimalSep)
           ];
         } else if (_selectedFrequency == Frequency.weekly) {
           paymentDays = [_selectedDayOfWeek];
           paymentAmounts = [
-            double.tryParse(_recurringAmountController.text) ?? 0
+            parseAmount(_recurringAmountController.text, _decimalSep)
           ];
         } else if (_selectedFrequency == Frequency.daily) {
-          if (!_isDailyVariable) {
-            paymentAmounts = [
-              double.tryParse(_recurringAmountController.text) ?? 0
-            ];
-          } else {
-            accumulated = double.tryParse(_recurringAmountController.text) ?? 0;
+          final amount =
+              parseAmount(_recurringAmountController.text, _decimalSep);
+          paymentAmounts = [amount];
+          if (_isDailyVariable) {
+            accumulated = amount;
           }
         }
+
+        // Obtener datos de moneda si multi-moneda esta habilitado
+        final isMultiCurrency = ref.read(isMultiCurrencyEnabledProvider);
 
         final newRecurring = RecurringMovement()
           ..title = _titleController.text
@@ -211,7 +220,9 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..paymentAmounts = paymentAmounts
           ..isVariableDaily = _isDailyVariable
           ..accumulatedAmount = accumulated
-          ..nextPaymentDate = DateTime.now();
+          ..nextPaymentDate = DateTime.now()
+          ..createdAt = DateTime.now()
+          ..currencyCode = isMultiCurrency ? _selectedCurrency : null;
 
         // 1. Guardar en Base de Datos
         await recurringDao.addRecurringMovement(newRecurring);
@@ -223,9 +234,10 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
       } else {
         // --- GUARDAR INGRESO EXTRA ---
         final transactionDao = ref.read(transactionDaoProvider);
+        final isMultiCurrency = ref.read(isMultiCurrencyEnabledProvider);
 
         final newTransaction = FinancialTransaction()
-          ..amount = double.parse(_amountController.text)
+          ..amount = parseAmount(_amountController.text, _decimalSep)
           ..note = _titleController.text.isEmpty
               ? "Ingreso Extra"
               : _titleController.text
@@ -235,7 +247,20 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
           ..categoryIconCode = FontAwesomeIcons.moneyBillWave.codePoint
           ..colorValue = 0xFF00B894; // Esmeralda
 
-        await transactionDao.addTransaction(newTransaction);
+        // Pasar datos de moneda si multi-moneda esta habilitado
+        double? currentRate;
+        String? currencyCode;
+        if (isMultiCurrency) {
+          final rateData = await ref.read(currentExchangeRateProvider.future);
+          currentRate = rateData?.rate;
+          currencyCode = _selectedCurrency;
+        }
+
+        await transactionDao.addTransaction(
+          newTransaction,
+          currencyCode: currencyCode,
+          exchangeRate: currentRate,
+        );
       }
 
       if (mounted) {
@@ -254,9 +279,26 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
   // ===========================================================================
 
   Widget _buildEventualForm(ColorScheme colors) {
+    final isMultiCurrency = ref.watch(isMultiCurrencyEnabledProvider);
     return Column(
       children: [
-        _buildMoneyInput(_amountController, "Monto Percibido", colors),
+        if (isMultiCurrency)
+          CurrencyInputField(
+            controller: _amountController,
+            hintText: "0.00",
+            iconColor: const Color(0xFF00B894),
+            initialCurrency: _selectedCurrency,
+            onCurrencyChanged: (currency) {
+              setState(() => _selectedCurrency = currency);
+            },
+            style: const TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF00B894),
+            ),
+          )
+        else
+          _buildMoneyInput(_amountController, "Monto Percibido", colors),
         const Gap(15),
         TextField(
           controller: _titleController,
@@ -470,7 +512,8 @@ class _AddIncomeModalState extends ConsumerState<AddIncomeModal> {
       TextEditingController controller, String label, ColorScheme colors) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [AmountInputFormatter(decimalSeparator: _decimalSep)],
       style: const TextStyle(fontWeight: FontWeight.bold),
       decoration: InputDecoration(
         prefixText: "\$ ",

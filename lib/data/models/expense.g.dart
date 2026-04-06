@@ -22,24 +22,29 @@ const ExpenseSchema = CollectionSchema(
       name: r'amount',
       type: IsarType.double,
     ),
-    r'date': PropertySchema(
+    r'currencyCode': PropertySchema(
       id: 1,
+      name: r'currencyCode',
+      type: IsarType.string,
+    ),
+    r'date': PropertySchema(
+      id: 2,
       name: r'date',
       type: IsarType.dateTime,
     ),
     r'frequency': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'frequency',
       type: IsarType.string,
       enumMap: _ExpensefrequencyEnumValueMap,
     ),
     r'isRecurring': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'isRecurring',
       type: IsarType.bool,
     ),
     r'title': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'title',
       type: IsarType.string,
     )
@@ -71,6 +76,12 @@ int _expenseEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.currencyCode;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.frequency.name.length * 3;
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
@@ -83,10 +94,11 @@ void _expenseSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.amount);
-  writer.writeDateTime(offsets[1], object.date);
-  writer.writeString(offsets[2], object.frequency.name);
-  writer.writeBool(offsets[3], object.isRecurring);
-  writer.writeString(offsets[4], object.title);
+  writer.writeString(offsets[1], object.currencyCode);
+  writer.writeDateTime(offsets[2], object.date);
+  writer.writeString(offsets[3], object.frequency.name);
+  writer.writeBool(offsets[4], object.isRecurring);
+  writer.writeString(offsets[5], object.title);
 }
 
 Expense _expenseDeserialize(
@@ -97,12 +109,13 @@ Expense _expenseDeserialize(
 ) {
   final object = Expense(
     amount: reader.readDouble(offsets[0]),
-    date: reader.readDateTime(offsets[1]),
+    currencyCode: reader.readStringOrNull(offsets[1]),
+    date: reader.readDateTime(offsets[2]),
     frequency:
-        _ExpensefrequencyValueEnumMap[reader.readStringOrNull(offsets[2])] ??
+        _ExpensefrequencyValueEnumMap[reader.readStringOrNull(offsets[3])] ??
             Frequency.monthly,
-    isRecurring: reader.readBoolOrNull(offsets[3]) ?? false,
-    title: reader.readString(offsets[4]),
+    isRecurring: reader.readBoolOrNull(offsets[4]) ?? false,
+    title: reader.readString(offsets[5]),
   );
   object.id = id;
   return object;
@@ -118,13 +131,15 @@ P _expenseDeserializeProp<P>(
     case 0:
       return (reader.readDouble(offset)) as P;
     case 1:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
+      return (reader.readDateTime(offset)) as P;
+    case 3:
       return (_ExpensefrequencyValueEnumMap[reader.readStringOrNull(offset)] ??
           Frequency.monthly) as P;
-    case 3:
-      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 4:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 5:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -296,6 +311,154 @@ extension ExpenseQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition>
+      currencyCodeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currencyCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'currencyCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition> currencyCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterFilterCondition>
+      currencyCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'currencyCode',
+        value: '',
       ));
     });
   }
@@ -708,6 +871,18 @@ extension ExpenseQuerySortBy on QueryBuilder<Expense, Expense, QSortBy> {
     });
   }
 
+  QueryBuilder<Expense, Expense, QAfterSortBy> sortByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> sortByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<Expense, Expense, QAfterSortBy> sortByDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.asc);
@@ -768,6 +943,18 @@ extension ExpenseQuerySortThenBy
   QueryBuilder<Expense, Expense, QAfterSortBy> thenByAmountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'amount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> thenByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Expense, Expense, QAfterSortBy> thenByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
     });
   }
 
@@ -840,6 +1027,13 @@ extension ExpenseQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Expense, Expense, QDistinct> distinctByCurrencyCode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currencyCode', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Expense, Expense, QDistinct> distinctByDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'date');
@@ -878,6 +1072,12 @@ extension ExpenseQueryProperty
   QueryBuilder<Expense, double, QQueryOperations> amountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'amount');
+    });
+  }
+
+  QueryBuilder<Expense, String?, QQueryOperations> currencyCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currencyCode');
     });
   }
 

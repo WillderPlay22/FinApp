@@ -22,4 +22,8 @@ class Debt {
   DateTime? nextPaymentDate;
   DateTime? dueDate; // Estimated date when debt will be paid off
   bool isPaidOff = false;
+
+  // --- MULTI-MONEDA ---
+  /// Código de moneda de los montos (null = moneda de referencia para retrocompatibilidad).
+  String? currencyCode;
 }

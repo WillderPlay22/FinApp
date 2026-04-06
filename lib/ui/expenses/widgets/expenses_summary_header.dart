@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
+import '../../../logic/providers/currency_providers.dart';
 
 class ExpensesSummaryHeader extends ConsumerStatefulWidget {
   final int tabIndex; // Cambiado de bool a int
@@ -193,7 +194,7 @@ class _ExpensesSummaryHeaderState extends ConsumerState<ExpensesSummaryHeader> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends ConsumerWidget {
   final String title;
   final AsyncValue<double> amountAsync;
   final Color color;
@@ -202,13 +203,15 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.title, required this.amountAsync, required this.color, this.isEnlarged = false});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 2);
+    final isMultiCurrency = ref.watch(isMultiCurrencyEnabledProvider);
+    final rateAsync = ref.watch(currentExchangeRateProvider);
 
     return Container(
-      width: double.infinity, // Asegura que ocupe todo el ancho disponible
-      constraints: const BoxConstraints(minHeight: 80), // Aumentado ligeramente
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 80),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color,
@@ -223,27 +226,51 @@ class _SummaryCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center, // Centra el contenido verticalmente
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             title,
             style: textTheme.labelMedium?.copyWith(
               color: Colors.white.withAlpha((255 * 0.8).round()),
               fontWeight: FontWeight.bold,
-              // Se agranda el título si la tarjeta es la principal
               fontSize: isEnlarged ? 14 : 12,
             ),
-            textAlign: TextAlign.center, // Centrar texto para títulos largos
-            maxLines: 2, // Permitir 2 líneas
+            textAlign: TextAlign.center,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          Gap(isEnlarged ? 8 : 4), // Más espacio en la tarjeta grande
+          Gap(isEnlarged ? 8 : 4),
           amountAsync.when(
-            data: (amount) => Text(
-              currencyFormat.format(amount),
-              style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+            data: (amount) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  currencyFormat.format(amount),
+                  style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+                ),
+                // Monto equivalente en BS si multi-moneda esta habilitado
+                if (isMultiCurrency)
+                  rateAsync.when(
+                    data: (rate) {
+                      if (rate == null) return const SizedBox.shrink();
+                      final bsAmount = amount * rate.rate;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Bs. ${NumberFormat('#,##0.00', 'es').format(bsAmount)}',
+                          style: TextStyle(
+                            fontSize: isEnlarged ? 12 : 10,
+                            color: Colors.white.withAlpha((255 * 0.65).round()),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+              ],
             ),
-            // Se agranda el indicador de carga y el texto de error
             loading: () => SizedBox(height: isEnlarged ? 32 : 24, child: Center(child: SizedBox(width: isEnlarged ? 32 : 24, height: isEnlarged ? 32 : 24, child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)))),
             error: (e, s) => const Text("Error", style: TextStyle(color: Colors.white70)),
           ),

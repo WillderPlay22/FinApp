@@ -6,6 +6,12 @@ class DateRange {
   final DateTime end;
   DateRange(this.start, this.end);
 
+  bool containsDate(DateTime date) =>
+      !date.isBefore(start) && !date.isAfter(end);
+
+  bool get isCrossMonth =>
+      start.month != end.month || start.year != end.year;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

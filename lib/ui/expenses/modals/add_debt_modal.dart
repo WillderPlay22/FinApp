@@ -4,6 +4,8 @@ import 'package:gap/gap.dart';
 import '../../../data/models/debt.dart'; // Import Debt model
 import '../../../logic/providers/database_providers.dart'; // For debtDaoProvider
 import '../../../logic/providers/time_provider.dart'; // For nowProvider
+import '../../../logic/providers/decimal_separator_provider.dart';
+import '../../shared/amount_input_formatter.dart';
 import 'package:intl/intl.dart'; // For date formatting
 
 // Enum para la frecuencia de pago
@@ -43,6 +45,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
   // Para evitar bucles infinitos en los listeners
   bool _isUpdating = false;
   bool _isFormValid = false;
+  String _decimalSep = '.';
 
   @override
   void initState() {
@@ -101,10 +104,12 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
     if (_isUpdating) return;
     _isUpdating = true;
 
-    final totalAmount = double.tryParse(_totalAmountController.text);
-    final initialPayment = double.tryParse(_initialPaymentController.text) ?? 0.0;
+    final totalRaw = parseAmount(_totalAmountController.text, _decimalSep);
+    final totalAmount = totalRaw > 0 ? totalRaw : null;
+    final initialPayment = parseAmount(_initialPaymentController.text, _decimalSep);
     final count = int.tryParse(_installmentCountController.text);
-    final amount = double.tryParse(_installmentAmountController.text);
+    final amountRaw = parseAmount(_installmentAmountController.text, _decimalSep);
+    final amount = amountRaw > 0 ? amountRaw : null;
 
     final isEditingTotal = _totalAmountFocus.hasFocus;
     final isEditingCount = _installmentCountFocus.hasFocus;
@@ -165,10 +170,10 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
     if (!_formKey.currentState!.validate()) return;
 
     // Lógica para mostrar el resumen antes de guardar
-    final total = double.tryParse(_totalAmountController.text) ?? 0;
+    final total = parseAmount(_totalAmountController.text, _decimalSep);
     final count = int.tryParse(_installmentCountController.text) ?? 0;
-    final amount = double.tryParse(_installmentAmountController.text) ?? 0.0;
-    final initialPayment = double.tryParse(_initialPaymentController.text) ?? 0.0;
+    final amount = parseAmount(_installmentAmountController.text, _decimalSep);
+    final initialPayment = parseAmount(_initialPaymentController.text, _decimalSep);
     final customDays = int.tryParse(_customDaysController.text);
 
     final debtDao = ref.read(debtDaoProvider);
@@ -213,10 +218,10 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
     final debtDao = ref.read(debtDaoProvider);
     final now = ref.read(nowProvider);
 
-    final totalAmount = double.tryParse(_totalAmountController.text) ?? 0.0;
-    final initialPayment = double.tryParse(_initialPaymentController.text) ?? 0.0;
+    final totalAmount = parseAmount(_totalAmountController.text, _decimalSep);
+    final initialPayment = parseAmount(_initialPaymentController.text, _decimalSep);
     final installmentCount = int.tryParse(_installmentCountController.text) ?? 0;
-    final installmentAmount = double.tryParse(_installmentAmountController.text) ?? 0.0;
+    final installmentAmount = parseAmount(_installmentAmountController.text, _decimalSep);
     final customDays = int.tryParse(_customDaysController.text);
 
     // Basic validation
@@ -252,6 +257,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
 
   @override
   Widget build(BuildContext context) {
+    _decimalSep = ref.watch(decimalSeparatorProvider);
     final colors = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.only(top: 20, left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 20),
@@ -327,9 +333,9 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
           const Gap(10),
           Row(
             children: [
-              Expanded(child: TextFormField(controller: _totalAmountController, focusNode: _totalAmountFocus, decoration: _inputDecoration(colors, "Monto Total", prefix: "\$"), keyboardType: TextInputType.number)),
+              Expanded(child: TextFormField(controller: _totalAmountController, focusNode: _totalAmountFocus, decoration: _inputDecoration(colors, "Monto Total", prefix: "\$"), keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [AmountInputFormatter(decimalSeparator: _decimalSep)])),
               const Gap(10),
-              Expanded(child: TextFormField(controller: _initialPaymentController, focusNode: _initialPaymentFocus, decoration: _inputDecoration(colors, "Pago Inicial", prefix: "\$"), keyboardType: TextInputType.number)),
+              Expanded(child: TextFormField(controller: _initialPaymentController, focusNode: _initialPaymentFocus, decoration: _inputDecoration(colors, "Pago Inicial", prefix: "\$"), keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [AmountInputFormatter(decimalSeparator: _decimalSep)])),
             ],
           ),
           const Gap(15),
@@ -337,7 +343,7 @@ class _AddDebtModalState extends ConsumerState<AddDebtModal> {
             children: [
               Expanded(child: TextFormField(controller: _installmentCountController, focusNode: _installmentCountFocus, decoration: _inputDecoration(colors, "Cuotas"), keyboardType: TextInputType.number)),
               const Gap(10),
-              Expanded(child: TextFormField(controller: _installmentAmountController, focusNode: _installmentAmountFocus, decoration: _inputDecoration(colors, "Monto Cuota", prefix: "\$"), keyboardType: TextInputType.number)),
+              Expanded(child: TextFormField(controller: _installmentAmountController, focusNode: _installmentAmountFocus, decoration: _inputDecoration(colors, "Monto Cuota", prefix: "\$"), keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [AmountInputFormatter(decimalSeparator: _decimalSep)])),
             ],
           ),
         ],

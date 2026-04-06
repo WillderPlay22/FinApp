@@ -7,8 +7,8 @@ plugins {
 android {
     namespace = "com.example.finapp"
     
-    // ✅ SDK 35
-    compileSdk = 35
+    // ✅ SDK 36 (requerido por shared_preferences_android)
+    compileSdk = 36
 
     ndkVersion = flutter.ndkVersion
 

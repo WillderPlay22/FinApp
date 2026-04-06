@@ -7,12 +7,23 @@ import '../models/enums.dart'; // For TransactionType
 import '../../ui/expenses/modals/add_debt_modal.dart'; // For DebtFrequency
 import '../../logic/providers/time_provider.dart'; // For ref.read(nowProvider)
 import '../../date_utils.dart'; // For getCycleDateRange
+import '../models/exchange_rate.dart';
+import '../models/currency_settings.dart';
 
 class DebtDao {
   final IsarService isarService;
   final Ref ref;
 
   DebtDao(this.isarService, this.ref);
+
+  /// Obtiene la tasa de cambio más reciente desde Isar.
+  Future<double?> _getLatestRate() async {
+    final isar = await isarService.db;
+    final settings = await isar.currencySettings.get(1);
+    if (settings == null || !settings.isMultiCurrencyEnabled) return null;
+    final rate = await isar.exchangeRates.where().sortByDateDesc().findFirst();
+    return rate?.rate;
+  }
 
   // Save a new debt
   Future<void> saveDebt(Debt debt) async {
@@ -78,7 +89,8 @@ class DebtDao {
 
       if (paymentAmount <= 0) return;
 
-      // Create a transaction for the payment
+      // Create a transaction for the payment (con soporte multi-moneda)
+      final effectiveCurrency = debt.currencyCode;
       final transaction = FinancialTransaction()
         ..amount = paymentAmount
         ..date = now
@@ -88,6 +100,7 @@ class DebtDao {
         ..categoryName = "Deudas"
         ..categoryIconCode = 0xf53d
         ..colorValue = 0xFF9C27B0
+        ..currencyCode = effectiveCurrency
         ..relatedDebt.value = debt;
 
       await isar.financialTransactions.put(transaction);
@@ -141,8 +154,18 @@ class DebtDao {
   }
 
   // Generic method to create a payment transaction for a debt
-  Future<void> _createDebtPaymentTransaction(Isar isar, Debt debt, double amount, String note) async {
+  /// [exchangeRate] y [currencyCode] son opcionales para multi-moneda.
+  Future<void> _createDebtPaymentTransaction(
+    Isar isar,
+    Debt debt,
+    double amount,
+    String note, {
+    double? exchangeRate,
+    String? currencyCode,
+  }) async {
     final now = ref.read(nowProvider);
+    final effectiveCurrency = currencyCode ?? debt.currencyCode;
+
     final transaction = FinancialTransaction()
       ..amount = amount
       ..date = now
@@ -152,7 +175,20 @@ class DebtDao {
       ..categoryName = "Deudas"
       ..categoryIconCode = 0xf53d // FontAwesomeIcons.fileInvoiceDollar.codePoint
       ..colorValue = 0xFF9C27B0 // Purple
+      ..currencyCode = effectiveCurrency
+      ..exchangeRateAtTime = exchangeRate
       ..relatedDebt.value = debt;
+
+    // Pre-calcular montos en ambas monedas si hay tasa
+    if (exchangeRate != null && effectiveCurrency != null) {
+      if (effectiveCurrency == 'USD') {
+        transaction.amountInReferenceCurrency = amount;
+        transaction.amountInLocalCurrency = amount * exchangeRate;
+      } else if (effectiveCurrency == 'BS') {
+        transaction.amountInLocalCurrency = amount;
+        transaction.amountInReferenceCurrency = amount / exchangeRate;
+      }
+    }
 
     await isar.financialTransactions.put(transaction);
     await transaction.relatedDebt.save();
@@ -261,12 +297,16 @@ class DebtDao {
     final isar = await isarService.db;
     final range = getCycleDateRange(now, Frequency.monthly);
 
-    yield* isar.financialTransactions
+    final query = isar.financialTransactions
         .filter()
         .categoryNameEqualTo("Deudas")
         .dateBetween(range.start, range.end)
-        .watch(fireImmediately: true)
-        .map((txs) => txs.fold(0.0, (sum, t) => sum + t.amount));
+        .build();
+
+    await for (final txs in query.watch(fireImmediately: true)) {
+      final rate = await _getLatestRate();
+      yield txs.fold(0.0, (sum, t) => sum + t.referenceAmountWithRate(rate));
+    }
   }
 
   // Observa el total pendiente de pago en deudas para este mes

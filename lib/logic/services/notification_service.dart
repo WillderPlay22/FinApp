@@ -129,8 +129,6 @@ class NotificationService {
   }
 
   Future<void> _processPayment(Isar db, RecurringMovement income, DateTime targetDate) async {
-    final now = DateTime.now();
-    
     // Usamos targetDate (la fecha de la notificación) para determinar si es quincena 1 o 2
     double amount = _getAmountForDate(income, tz.TZDateTime.from(targetDate, tz.local));
 
@@ -140,7 +138,7 @@ class NotificationService {
     final newTx = FinancialTransaction()
       ..amount = amount
       ..note = noteText
-      ..date = now 
+      ..date = targetDate
       ..type = TransactionType.income
       ..categoryName = income.title 
       ..categoryIconCode = 0xf0d6
@@ -232,7 +230,7 @@ class NotificationService {
       candidateDate = candidateDate.add(const Duration(days: 1));
     }
 
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < 365; i++) {
       if (_matchesFrequency(income, candidateDate)) {
         return candidateDate;
       }

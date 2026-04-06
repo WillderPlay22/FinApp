@@ -4,7 +4,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:isar/isar.dart';
 import '../../../data/models/category.dart';
-import '../../../data/models/enums.dart';
 import '../../../logic/providers/database_providers.dart';
 import '../../shared/icon_mapper.dart'; // ✅ Esta ruta ya es correcta
 
@@ -24,12 +23,11 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
   // ✅ 2. UN GETTER PARA SABER FÁCILMENTE SI ESTAMOS EDITANDO
   bool get isEditing => widget.categoryToEdit != null;
 
-  // Selección por defecto
+  final _budgetLimitController = TextEditingController();
+
+  // Seleccion por defecto
   int _selectedIconCode = FontAwesomeIcons.tag.codePoint;
   Color _selectedColor = Colors.blue;
-  Frequency _selectedFrequency = Frequency.monthly;
-
-  // ✅ 3. RELLENAMOS LOS DATOS SI ESTAMOS EDITANDO
   @override
   void initState() {
     super.initState();
@@ -38,7 +36,9 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
       _nameController.text = category.name;
       _selectedIconCode = category.iconCode;
       _selectedColor = Color(category.colorValue);
-      _selectedFrequency = category.frequency ?? Frequency.monthly;
+      if (category.budgetLimit != null) {
+        _budgetLimitController.text = category.budgetLimit!.toStringAsFixed(0);
+      }
     }
   }
 
@@ -96,32 +96,21 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
           ),
             const Gap(20),
 
-            // 2. SELECTOR DE FRECUENCIA
-            Row(
-            children: [
-              const Text("Frecuencia:", style: TextStyle(fontWeight: FontWeight.bold)),
-              const Gap(10),
-              Expanded(
-                child: DropdownButtonFormField<Frequency>(
-                  // ignore: deprecated_member_use
-                  value: _selectedFrequency,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: Frequency.weekly, child: Text("Semanal")),
-                    DropdownMenuItem(value: Frequency.biweekly, child: Text("Quincenal")),
-                    DropdownMenuItem(value: Frequency.monthly, child: Text("Mensual")),
-                    DropdownMenuItem(value: Frequency.yearly, child: Text("Anual")),
-                  ], 
-                  onChanged: (v) => setState(() => _selectedFrequency = v!),
-                ),
+            // LIMITE DE PRESUPUESTO (OPCIONAL)
+            TextField(
+              controller: _budgetLimitController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Límite de presupuesto (opcional)",
+                hintText: "Ej: 500000",
+                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                filled: true,
+                fillColor: colors.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
               ),
-            ],
             ),
             const Gap(5),
-            Text("Define cada cuánto se renuevan los gastos fijos de esta categoría.", style: TextStyle(fontSize: 10, color: colors.outline)),
+            Text("Si defines un límite, verás un indicador cuando te acerques o lo excedas.", style: TextStyle(fontSize: 10, color: colors.outline)),
 
             const Gap(20),
 
@@ -211,15 +200,17 @@ class _CreateCategoryModalState extends ConsumerState<CreateCategoryModal> {
       return;
     }
 
-    // ✅ 6. LÓGICA DE GUARDADO (CREAR O ACTUALIZAR)
+    final budgetText = _budgetLimitController.text.trim();
+    final budgetLimit = budgetText.isNotEmpty ? double.tryParse(budgetText) : null;
+
     final category = Category(
       name: _nameController.text,
       iconCode: _selectedIconCode,
       // ignore: deprecated_member_use
       colorValue: _selectedColor.value,
-      frequency: _selectedFrequency,
       isExpense: true,
-    )..id = widget.categoryToEdit?.id ?? Isar.autoIncrement; // Si editamos, usamos el ID existente
+      budgetLimit: budgetLimit,
+    )..id = widget.categoryToEdit?.id ?? Isar.autoIncrement;
 
     // Guardamos en BD
     ref.read(categoryDaoProvider).addCategory(category);

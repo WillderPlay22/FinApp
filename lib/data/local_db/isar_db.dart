@@ -8,6 +8,9 @@ import '../models/category.dart';
 import '../models/expense.dart';
 import '../models/debt.dart'; // Import the new Debt model
 import '../models/saving.dart';
+// Modelos de Multi-Moneda
+import '../models/exchange_rate.dart';
+import '../models/currency_settings.dart';
 
 class IsarService {
   late Future<Isar> db;
@@ -31,6 +34,9 @@ class IsarService {
           ExpenseSchema,
           DebtSchema, // Add DebtSchema
           SavingSchema,
+          // Multi-Moneda
+          ExchangeRateSchema,
+          CurrencySettingsSchema,
         ], 
         directory: dir.path,
         inspector: true, // Nos permite ver la BD mientras programamos

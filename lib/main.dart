@@ -3,17 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:isar/isar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'config/theme/app_theme.dart';
+import 'logic/providers/theme_provider.dart';
 import 'ui/home/home_screen.dart';
-import 'ui/expenses/expenses_screen.dart';
-import 'ui/income/income_screen.dart';
-import 'ui/savings/savings_screen.dart';
+import 'ui/planning/planning_screen.dart';
+import 'ui/settings/settings_screen.dart';
+import 'ui/widgets/floating_nav_bar.dart';
 import 'logic/providers/time_provider.dart';
 import 'data/local_db/isar_db.dart';
 import 'logic/services/category_seeder.dart';
 import 'logic/services/notification_service.dart';
 import 'ui/income/modals/recurring_detail_modal.dart';
-import 'data/models/recurring_movement.dart'; 
+import 'data/models/recurring_movement.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -21,19 +23,30 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
 
-  // 1. Iniciar Servicio de Notificaciones
+  // 1. Iniciar SharedPreferences para el tema
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  // 2. Iniciar Servicio de Notificaciones
   await NotificationService().init();
 
   final isarService = IsarService();
   final seeder = CategorySeeder(isarService);
   await seeder.seedDefaults();
 
-  // 2. Programar notificaciones al iniciar (para recuperar alarmas si se apagó el cel)
+  // 3. Programar notificaciones al iniciar (para recuperar alarmas si se apagó el cel)
   final isar = await isarService.db;
   final allIncomes = await isar.recurringMovements.where().findAll();
   await NotificationService().scheduleAllNotifications(allIncomes);
 
-  runApp(const ProviderScope(child: MainApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Sobrescribimos el provider de SharedPreferences con la instancia real
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const MainApp(),
+    ),
+  );
 }
 
 // --- WIDGET CONTENEDOR CON LA BARRA DE NAVEGACIÓN ---
@@ -48,13 +61,10 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
-  // Lista de las 4 pantallas principales
-  // ✅ Se cambia a 'final' porque contiene '_savingsScreen' que ya no es 'const'.
   static final List<Widget> _widgetOptions = <Widget>[
-    const HomeScreen(),     // La nueva pantalla de inicio
-    const ExpensesScreen(), // Tu pantalla de gastos existente
-    const IncomeScreen(),   // Tu pantalla de ingresos existente
-    const SavingsScreen(),  // ✅ Módulo de Ahorro Real
+    const HomeScreen(),
+    const PlanningScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -77,19 +87,119 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Gastos'),
-          BottomNavigationBarItem(icon: Icon(Icons.monetization_on_outlined), activeIcon: Icon(Icons.monetization_on), label: 'Ingresos'),
-          BottomNavigationBarItem(icon: Icon(Icons.savings_outlined), activeIcon: Icon(Icons.savings), label: 'Ahorro'),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        type: BottomNavigationBarType.fixed, // Mantiene los 4 items visibles
-        showUnselectedLabels: true,
+      extendBody: true,
+      body: _SlideNavStack(
+        index: _selectedIndex,
+        children: _widgetOptions,
       ),
+      bottomNavigationBar: FloatingNavBar(
+        selectedIndex: _selectedIndex,
+        onItemTap: (i) => setState(() => _selectedIndex = i),
+      ),
+    );
+  }
+}
+
+// ── Slide lateral entre pestañas del nav bar ──────────────────────────────
+
+class _SlideNavStack extends StatefulWidget {
+  final int index;
+  final List<Widget> children;
+
+  const _SlideNavStack({required this.index, required this.children});
+
+  @override
+  State<_SlideNavStack> createState() => _SlideNavStackState();
+}
+
+class _SlideNavStackState extends State<_SlideNavStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  int _prevIndex = 0;
+  int _currIndex = 0;
+  bool _isSliding = false;
+  bool _forward = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _currIndex = widget.index;
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+    _ctrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        _ctrl.reset();
+        if (mounted) setState(() => _isSliding = false);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_SlideNavStack old) {
+    super.didUpdateWidget(old);
+    if (widget.index != _currIndex) {
+      if (_isSliding) {
+        _ctrl.stop();
+        _ctrl.reset();
+      }
+      _forward = widget.index > _currIndex;
+      _prevIndex = _currIndex;
+      _currIndex = widget.index;
+      setState(() => _isSliding = true);
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) {
+        final t = _anim.value;
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: List.generate(widget.children.length, (i) {
+            final child = widget.children[i];
+
+            if (!_isSliding) {
+              if (i == _currIndex) return child;
+              return Offstage(
+                child: TickerMode(enabled: false, child: child),
+              );
+            }
+
+            if (i == _prevIndex) {
+              final dx = _forward ? -t : t;
+              return FractionalTranslation(
+                translation: Offset(dx, 0),
+                child: child,
+              );
+            }
+            if (i == _currIndex) {
+              final dx = _forward ? 1.0 - t : -(1.0 - t);
+              return FractionalTranslation(
+                translation: Offset(dx, 0),
+                child: child,
+              );
+            }
+
+            return Offstage(
+              child: TickerMode(enabled: false, child: child),
+            );
+          }),
+        );
+      },
     );
   }
 }
@@ -137,18 +247,27 @@ class _MainAppState extends ConsumerState<MainApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Observamos el estado completo del tema (modo + paleta)
+    final themeState = ref.watch(themeNotifierProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'FinApp',
-      navigatorKey: navigatorKey, 
-      theme: AppTheme().getTheme(),
+      navigatorKey: navigatorKey,
+
+      // Temas claro y oscuro con la paleta seleccionada
+      theme: AppTheme.lightTheme(themeState.palette),
+      darkTheme: AppTheme.darkTheme(themeState.palette),
+      themeMode: themeMode,
+
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('es', 'ES'), Locale('en', 'US')],
-      home: const AppShell(), // La app ahora empieza en el AppShell
+      home: const AppShell(),
     );
   }
 }
@@ -162,8 +281,6 @@ class LifecycleObserver with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Cuando la app vuelve al primer plano, invalidamos el proveedor de tiempo.
-      // Esto fuerza a todos los widgets que lo observan a reconstruirse con la
-      // fecha y hora actualizadas, solucionando el problema de los ciclos.
       ref.invalidate(nowProvider);
     }
   }

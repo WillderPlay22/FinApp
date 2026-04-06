@@ -7,6 +7,7 @@ import '../../../data/local_db/isar_db.dart';
 import '../../../data/models/recurring_movement.dart';
 import '../../../date_utils.dart';
 import '../../shared/icon_mapper.dart';
+import '../../shared/currency_amount_display.dart';
 import '../modals/recurring_detail_modal.dart';
 
 class FixedIncomeList extends ConsumerWidget {
@@ -55,15 +56,15 @@ class FixedIncomeList extends ConsumerWidget {
   }
 }
 
-class _FixedIncomeCard extends StatelessWidget {
+class _FixedIncomeCard extends ConsumerWidget {
   final RecurringMovement income;
 
   const _FixedIncomeCard({required this.income});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
-    
+
     // Valores calculados/por defecto ya que RecurringMovement tiene una estructura diferente
     final int colorValue = Colors.teal.toARGB32(); // Color fijo para ingresos
     final int iconCode = FontAwesomeIcons.moneyBillWave.codePoint; // Icono fijo
@@ -152,7 +153,13 @@ class _FixedIncomeCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text("Est. Mensual", style: TextStyle(fontSize: 10, color: colors.outline)),
-                      Text("\$${totalAmount.toStringAsFixed(2)}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: colors.primary)),
+                      CurrencyAmountDisplay(
+                        amount: totalAmount,
+                        currencyCode: income.currencyCode,
+                        textAlign: TextAlign.end,
+                        primaryStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: colors.primary),
+                        secondaryStyle: TextStyle(fontSize: 11, color: colors.outline),
+                      ),
                       Icon(Icons.arrow_forward_ios, size: 12, color: colors.outline)
                     ],
                   )

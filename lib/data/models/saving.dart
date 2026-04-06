@@ -22,4 +22,8 @@ class Saving {
 
   int colorValue = 0xFFE91E63; // Pink por defecto
   int iconCode = 0xf555; // Piggy Bank
+
+  // --- MULTI-MONEDA ---
+  /// Código de moneda de los montos (null = moneda de referencia para retrocompatibilidad).
+  String? currencyCode;
 }

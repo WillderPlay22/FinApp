@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
+import '../../../logic/providers/currency_providers.dart';
 
 class IncomeSummaryHeader extends ConsumerStatefulWidget {
   final int tabIndex;
@@ -160,7 +161,7 @@ class _IncomeSummaryHeaderState extends ConsumerState<IncomeSummaryHeader> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends ConsumerWidget {
   final String title;
   final AsyncValue<double> amountAsync;
   final Color color;
@@ -169,9 +170,11 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.title, required this.amountAsync, required this.color, this.isEnlarged = false});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final currencyFormat = NumberFormat.currency(locale: 'es', symbol: '\$', decimalDigits: 2);
+    final isMultiCurrency = ref.watch(isMultiCurrencyEnabledProvider);
+    final rateAsync = ref.watch(currentExchangeRateProvider);
 
     return Container(
       width: double.infinity,
@@ -205,9 +208,34 @@ class _SummaryCard extends StatelessWidget {
           ),
           Gap(isEnlarged ? 8 : 4),
           amountAsync.when(
-            data: (amount) => Text(
-              currencyFormat.format(amount),
-              style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+            data: (amount) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  currencyFormat.format(amount),
+                  style: TextStyle(fontSize: isEnlarged ? 26 : 20, fontWeight: FontWeight.w900, color: Colors.white),
+                ),
+                if (isMultiCurrency)
+                  rateAsync.when(
+                    data: (rate) {
+                      if (rate == null) return const SizedBox.shrink();
+                      final bsAmount = amount * rate.rate;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Bs. ${NumberFormat('#,##0.00', 'es').format(bsAmount)}',
+                          style: TextStyle(
+                            fontSize: isEnlarged ? 12 : 10,
+                            color: Colors.white.withAlpha((255 * 0.65).round()),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+              ],
             ),
             loading: () => SizedBox(height: isEnlarged ? 32 : 24, child: Center(child: SizedBox(width: isEnlarged ? 32 : 24, height: isEnlarged ? 32 : 24, child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)))),
             error: (e, s) => const Text("Error", style: TextStyle(color: Colors.white70)),

@@ -8,10 +8,28 @@ import '../models/expense.dart';
 import '../models/recurring_movement.dart';
 import '../../date_utils.dart';
 import '../../logic/providers/time_provider.dart';
+import '../models/exchange_rate.dart';
+import '../models/currency_settings.dart';
 
 class SavingsDao {
   final IsarService isarService;
   final Ref ref;
+
+  /// Obtiene la tasa de cambio más reciente desde Isar.
+  Future<double?> _getLatestRate() async {
+    final isar = await isarService.db;
+    final settings = await isar.currencySettings.get(1);
+    if (settings == null || !settings.isMultiCurrencyEnabled) return null;
+    final rate = await isar.exchangeRates.where().sortByDateDesc().findFirst();
+    return rate?.rate;
+  }
+
+  /// Convierte un monto a moneda de referencia (USD) si está en moneda local (BS).
+  double _toReference(double amount, String? currencyCode, double? rate) {
+    if (rate == null || currencyCode == null || currencyCode == 'USD') return amount;
+    if (currencyCode == 'BS') return amount / rate;
+    return amount;
+  }
 
   SavingsDao(this.isarService, this.ref);
 
@@ -55,29 +73,48 @@ class SavingsDao {
   }
 
   // 4. Registrar un depósito (Transacción de Ahorro)
-  Future<void> depositToSaving(Saving saving, double amount) async {
+  /// [exchangeRate] y [currencyCode] son opcionales para multi-moneda.
+  Future<void> depositToSaving(
+    Saving saving,
+    double amount, {
+    double? exchangeRate,
+    String? currencyCode,
+  }) async {
     final isar = await isarService.db;
     final now = ref.read(nowProvider);
+    final effectiveCurrency = currencyCode ?? saving.currencyCode;
 
     final transaction = FinancialTransaction()
       ..amount = amount
       ..date = now
-      ..note = "Ahorro: ${saving.name}"
-      ..type = TransactionType.saving // Nuevo tipo
+      ..note = "Depósito a: ${saving.name}"
+      ..type = TransactionType.saving
       ..categoryName = "Ahorro"
       ..categoryIconCode = saving.iconCode
       ..colorValue = saving.colorValue
-      ..note = "Depósito a: ${saving.name}"
-      ..relatedSaving.value = saving; // ✅ VINCULAMOS EL AHORRO
+      ..currencyCode = effectiveCurrency
+      ..exchangeRateAtTime = exchangeRate
+      ..relatedSaving.value = saving;
+
+    // Pre-calcular montos en ambas monedas si hay tasa
+    if (exchangeRate != null && effectiveCurrency != null) {
+      if (effectiveCurrency == 'USD') {
+        transaction.amountInReferenceCurrency = amount;
+        transaction.amountInLocalCurrency = amount * exchangeRate;
+      } else if (effectiveCurrency == 'BS') {
+        transaction.amountInLocalCurrency = amount;
+        transaction.amountInReferenceCurrency = amount / exchangeRate;
+      }
+    }
 
     await isar.writeTxn(() async {
       // Actualizar monto actual del ahorro
       saving.currentAmount += amount;
       await isar.savings.put(saving);
-      
+
       // Guardar transacción
       await isar.financialTransactions.put(transaction);
-      await transaction.relatedSaving.save(); // ✅ GUARDAMOS EL VÍNCULO
+      await transaction.relatedSaving.save();
     });
   }
 
@@ -91,9 +128,11 @@ class SavingsDao {
     // A. INGRESOS
     // A1. Fijos (Proyección total de la configuración)
     final recurringIncomes = await isar.recurringMovements.filter().typeEqualTo(TransactionType.income).findAll();
+    final rate = await _getLatestRate();
     double projectedIncome = 0;
     for (var m in recurringIncomes) {
-      projectedIncome += (m.paymentAmounts ?? []).fold(0.0, (sum, e) => sum + e);
+      final cycleSum = (m.paymentAmounts ?? []).fold(0.0, (sum, e) => sum + e);
+      projectedIncome += _toReference(cycleSum, m.currencyCode, rate);
     }
     // A2. Extras (Ya ejecutados este mes)
     final extraIncomes = await isar.financialTransactions
@@ -102,7 +141,7 @@ class SavingsDao {
         .isRecurringEqualTo(false) // Solo extras puros
         .dateBetween(range.start, range.end)
         .findAll();
-    double extraIncomeTotal = extraIncomes.fold(0, (sum, t) => sum + t.amount);
+    double extraIncomeTotal = extraIncomes.fold(0, (sum, t) => sum + t.referenceAmountWithRate(rate));
 
     // B. GASTOS
     // B1. Fijos (Proyección mensualizada)
@@ -110,15 +149,19 @@ class SavingsDao {
     double projectedExpense = 0;
     for (var e in fixedExpenses) {
       // Lógica simple de mensualización
+      double monthlyAmt;
       if (e.frequency == Frequency.monthly) {
-        projectedExpense += e.amount;
+        monthlyAmt = e.amount;
       } else if (e.frequency == Frequency.biweekly) {
-        projectedExpense += e.amount * 2;
+        monthlyAmt = e.amount * 2;
       } else if (e.frequency == Frequency.weekly) {
-        projectedExpense += e.amount * 4;
+        monthlyAmt = e.amount * 4;
       } else if (e.frequency == Frequency.daily) {
-        projectedExpense += e.amount * 30;
+        monthlyAmt = e.amount * 30;
+      } else {
+        monthlyAmt = e.amount;
       }
+      projectedExpense += _toReference(monthlyAmt, e.currencyCode, rate);
     }
     // B2. Extras (Ya ejecutados este mes)
     final extraExpenses = await isar.financialTransactions
@@ -127,13 +170,55 @@ class SavingsDao {
         .isRecurringEqualTo(false)
         .dateBetween(range.start, range.end)
         .findAll();
-    double extraExpenseTotal = extraExpenses.fold(0, (sum, t) => sum + t.amount);
+    double extraExpenseTotal = extraExpenses.fold(0, (sum, t) => sum + t.referenceAmountWithRate(rate));
 
     // C. CÁLCULO FINAL
     final totalIncome = projectedIncome + extraIncomeTotal;
     final totalExpense = projectedExpense + extraExpenseTotal;
     
     return (totalIncome - totalExpense);
+  }
+
+  // 5.5 Retirar fondos de un ahorro (fuente única de retiros)
+  Future<void> withdrawFromSaving(
+    Saving saving,
+    double amount, {
+    double? exchangeRate,
+    String? currencyCode,
+  }) async {
+    if (amount <= 0 || amount > saving.currentAmount) return;
+    final isar = await isarService.db;
+    final now = ref.read(nowProvider);
+    final effectiveCurrency = currencyCode ?? saving.currencyCode;
+
+    final transaction = FinancialTransaction()
+      ..amount = -amount // Negativo para distinguir retiros de depósitos
+      ..date = now
+      ..note = "Retiro de: ${saving.name}"
+      ..type = TransactionType.saving
+      ..categoryName = "Ahorro"
+      ..categoryIconCode = saving.iconCode
+      ..colorValue = saving.colorValue
+      ..currencyCode = effectiveCurrency
+      ..exchangeRateAtTime = exchangeRate
+      ..relatedSaving.value = saving;
+
+    if (exchangeRate != null && effectiveCurrency != null) {
+      if (effectiveCurrency == 'USD') {
+        transaction.amountInReferenceCurrency = -amount;
+        transaction.amountInLocalCurrency = -amount * exchangeRate;
+      } else if (effectiveCurrency == 'BS') {
+        transaction.amountInLocalCurrency = -amount;
+        transaction.amountInReferenceCurrency = -amount / exchangeRate;
+      }
+    }
+
+    await isar.writeTxn(() async {
+      saving.currentAmount -= amount;
+      await isar.savings.put(saving);
+      await isar.financialTransactions.put(transaction);
+      await transaction.relatedSaving.save();
+    });
   }
 
   // 6. Borrar Ahorro
@@ -143,9 +228,10 @@ class SavingsDao {
   }
 
   // 7. Obtener Progreso Mensual (Para la tarjeta de resumen)
-  Stream<({double expected, double executed, int totalPlans, int executedPlans})> watchMonthlyProgress() async* {
+  // [now] se recibe como parámetro para que el provider lo proporcione
+  // reactivamente — si cambia de mes, el stream se recrea automáticamente.
+  Stream<({double expected, double executed, int totalPlans, int executedPlans})> watchMonthlyProgress(DateTime now) async* {
     final isar = await isarService.db;
-    final now = ref.read(nowProvider);
     final range = getCycleDateRange(now, Frequency.monthly);
 
     // Escuchamos cambios en Ahorros y Transacciones
@@ -155,22 +241,29 @@ class SavingsDao {
         .dateBetween(range.start, range.end)
         .watch(fireImmediately: true)
         .asyncMap((transactions) async {
-          
+          final rate = await _getLatestRate();
           final savings = await isar.savings.where().findAll();
-          
-          // Identificar qué ahorros han recibido depósitos este mes
-          final savingsWithDepositsThisMonth = <int>{};
+
+          // Cargar relaciones para todas las transacciones
           for (var t in transactions) {
             await t.relatedSaving.load();
-            if (t.relatedSaving.value != null) {
-              savingsWithDepositsThisMonth.add(t.relatedSaving.value!.id);
-            }
           }
-          
+
           double expectedTotal = 0.0;
           double executedTotal = 0.0;
           int totalPlans = 0;
           int executedPlans = 0;
+
+          // Solo depósitos (amount > 0), ignorar retiros para el progreso mensual
+          final deposits = transactions.where((t) => t.amount > 0).toList();
+
+          // Identificar ahorros con depósitos (no retiros) este mes
+          final savingsWithDepositsThisMonth = <int>{};
+          for (var t in deposits) {
+            if (t.relatedSaving.value != null) {
+              savingsWithDepositsThisMonth.add(t.relatedSaving.value!.id);
+            }
+          }
 
           // 1. Calcular lo esperado
           final netProjection = await calculateMonthlyNetProjection();
@@ -181,14 +274,10 @@ class SavingsDao {
             final target = s.targetAmount ?? 0.0;
             // ¿Está completado?
             final isCompleted = isGoal && target > 0 && s.currentAmount >= target;
-            // ¿Tuvo actividad este mes?
+            // ¿Tuvo depósitos este mes?
             final contributedThisMonth = savingsWithDepositsThisMonth.contains(s.id);
 
-            // LÓGICA DE CICLO:
-            // Incluimos el ahorro en el plan mensual si:
-            // 1. NO está completado (aún requiere cuotas).
-            // 2. ESTÁ completado PERO se contribuyó este mes (se completó recién).
-            // Si se completó el mes pasado y no se tocó este mes, se ignora.
+            // Incluir en el plan si no está completado, o si se completó este mes
             if (!isCompleted || contributedThisMonth) {
               totalPlans++;
 
@@ -199,13 +288,12 @@ class SavingsDao {
                 expectedTotal += baseProjection * ((s.percentage ?? 0.0) / 100);
               }
 
-              // Sumar al ejecutado si corresponde
+              // Sumar al ejecutado (solo depósitos de este ahorro)
               if (contributedThisMonth) {
                 executedPlans++;
-                // Sumamos solo las transacciones de ESTE ahorro
-                final txs = transactions.where((t) => t.relatedSaving.value?.id == s.id);
+                final txs = deposits.where((t) => t.relatedSaving.value?.id == s.id);
                 for (var t in txs) {
-                  executedTotal += t.amount;
+                  executedTotal += t.referenceAmountWithRate(rate);
                 }
               }
             }

@@ -23,43 +23,79 @@ const FinancialTransactionSchema = CollectionSchema(
       name: r'amount',
       type: IsarType.double,
     ),
-    r'categoryIconCode': PropertySchema(
+    r'amountInLocalCurrency': PropertySchema(
       id: 1,
+      name: r'amountInLocalCurrency',
+      type: IsarType.double,
+    ),
+    r'amountInReferenceCurrency': PropertySchema(
+      id: 2,
+      name: r'amountInReferenceCurrency',
+      type: IsarType.double,
+    ),
+    r'categoryIconCode': PropertySchema(
+      id: 3,
       name: r'categoryIconCode',
       type: IsarType.long,
     ),
     r'categoryName': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'categoryName',
       type: IsarType.string,
     ),
     r'colorValue': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'colorValue',
       type: IsarType.long,
     ),
+    r'currencyCode': PropertySchema(
+      id: 6,
+      name: r'currencyCode',
+      type: IsarType.string,
+    ),
     r'date': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'date',
       type: IsarType.dateTime,
     ),
+    r'exchangeRateAtTime': PropertySchema(
+      id: 8,
+      name: r'exchangeRateAtTime',
+      type: IsarType.double,
+    ),
+    r'fixedLocalPortion': PropertySchema(
+      id: 9,
+      name: r'fixedLocalPortion',
+      type: IsarType.double,
+    ),
+    r'fixedReferencePortion': PropertySchema(
+      id: 10,
+      name: r'fixedReferencePortion',
+      type: IsarType.double,
+    ),
     r'isRecurring': PropertySchema(
-      id: 5,
+      id: 11,
       name: r'isRecurring',
       type: IsarType.bool,
     ),
     r'note': PropertySchema(
-      id: 6,
+      id: 12,
       name: r'note',
       type: IsarType.string,
     ),
     r'parentRecurringId': PropertySchema(
-      id: 7,
+      id: 13,
       name: r'parentRecurringId',
       type: IsarType.long,
     ),
+    r'paymentMode': PropertySchema(
+      id: 14,
+      name: r'paymentMode',
+      type: IsarType.string,
+      enumMap: _FinancialTransactionpaymentModeEnumValueMap,
+    ),
     r'type': PropertySchema(
-      id: 8,
+      id: 15,
       name: r'type',
       type: IsarType.string,
       enumMap: _FinancialTransactiontypeEnumValueMap,
@@ -132,7 +168,19 @@ int _financialTransactionEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.categoryName.length * 3;
+  {
+    final value = object.currencyCode;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.note.length * 3;
+  {
+    final value = object.paymentMode;
+    if (value != null) {
+      bytesCount += 3 + value.name.length * 3;
+    }
+  }
   bytesCount += 3 + object.type.name.length * 3;
   return bytesCount;
 }
@@ -144,14 +192,21 @@ void _financialTransactionSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.amount);
-  writer.writeLong(offsets[1], object.categoryIconCode);
-  writer.writeString(offsets[2], object.categoryName);
-  writer.writeLong(offsets[3], object.colorValue);
-  writer.writeDateTime(offsets[4], object.date);
-  writer.writeBool(offsets[5], object.isRecurring);
-  writer.writeString(offsets[6], object.note);
-  writer.writeLong(offsets[7], object.parentRecurringId);
-  writer.writeString(offsets[8], object.type.name);
+  writer.writeDouble(offsets[1], object.amountInLocalCurrency);
+  writer.writeDouble(offsets[2], object.amountInReferenceCurrency);
+  writer.writeLong(offsets[3], object.categoryIconCode);
+  writer.writeString(offsets[4], object.categoryName);
+  writer.writeLong(offsets[5], object.colorValue);
+  writer.writeString(offsets[6], object.currencyCode);
+  writer.writeDateTime(offsets[7], object.date);
+  writer.writeDouble(offsets[8], object.exchangeRateAtTime);
+  writer.writeDouble(offsets[9], object.fixedLocalPortion);
+  writer.writeDouble(offsets[10], object.fixedReferencePortion);
+  writer.writeBool(offsets[11], object.isRecurring);
+  writer.writeString(offsets[12], object.note);
+  writer.writeLong(offsets[13], object.parentRecurringId);
+  writer.writeString(offsets[14], object.paymentMode?.name);
+  writer.writeString(offsets[15], object.type.name);
 }
 
 FinancialTransaction _financialTransactionDeserialize(
@@ -162,16 +217,24 @@ FinancialTransaction _financialTransactionDeserialize(
 ) {
   final object = FinancialTransaction();
   object.amount = reader.readDouble(offsets[0]);
-  object.categoryIconCode = reader.readLong(offsets[1]);
-  object.categoryName = reader.readString(offsets[2]);
-  object.colorValue = reader.readLong(offsets[3]);
-  object.date = reader.readDateTime(offsets[4]);
+  object.amountInLocalCurrency = reader.readDoubleOrNull(offsets[1]);
+  object.amountInReferenceCurrency = reader.readDoubleOrNull(offsets[2]);
+  object.categoryIconCode = reader.readLong(offsets[3]);
+  object.categoryName = reader.readString(offsets[4]);
+  object.colorValue = reader.readLong(offsets[5]);
+  object.currencyCode = reader.readStringOrNull(offsets[6]);
+  object.date = reader.readDateTime(offsets[7]);
+  object.exchangeRateAtTime = reader.readDoubleOrNull(offsets[8]);
+  object.fixedLocalPortion = reader.readDoubleOrNull(offsets[9]);
+  object.fixedReferencePortion = reader.readDoubleOrNull(offsets[10]);
   object.id = id;
-  object.isRecurring = reader.readBool(offsets[5]);
-  object.note = reader.readString(offsets[6]);
-  object.parentRecurringId = reader.readLongOrNull(offsets[7]);
+  object.isRecurring = reader.readBool(offsets[11]);
+  object.note = reader.readString(offsets[12]);
+  object.parentRecurringId = reader.readLongOrNull(offsets[13]);
+  object.paymentMode = _FinancialTransactionpaymentModeValueEnumMap[
+      reader.readStringOrNull(offsets[14])];
   object.type = _FinancialTransactiontypeValueEnumMap[
-          reader.readStringOrNull(offsets[8])] ??
+          reader.readStringOrNull(offsets[15])] ??
       TransactionType.income;
   return object;
 }
@@ -186,20 +249,35 @@ P _financialTransactionDeserializeProp<P>(
     case 0:
       return (reader.readDouble(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readDateTime(offset)) as P;
-    case 5:
-      return (reader.readBool(offset)) as P;
-    case 6:
       return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readLong(offset)) as P;
+    case 6:
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 8:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 9:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 10:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 11:
+      return (reader.readBool(offset)) as P;
+    case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
+      return (reader.readLongOrNull(offset)) as P;
+    case 14:
+      return (_FinancialTransactionpaymentModeValueEnumMap[
+          reader.readStringOrNull(offset)]) as P;
+    case 15:
       return (_FinancialTransactiontypeValueEnumMap[
               reader.readStringOrNull(offset)] ??
           TransactionType.income) as P;
@@ -208,6 +286,18 @@ P _financialTransactionDeserializeProp<P>(
   }
 }
 
+const _FinancialTransactionpaymentModeEnumValueMap = {
+  r'singleCurrency': r'singleCurrency',
+  r'allReference': r'allReference',
+  r'allLocal': r'allLocal',
+  r'mixed': r'mixed',
+};
+const _FinancialTransactionpaymentModeValueEnumMap = {
+  r'singleCurrency': PaymentMode.singleCurrency,
+  r'allReference': PaymentMode.allReference,
+  r'allLocal': PaymentMode.allLocal,
+  r'mixed': PaymentMode.mixed,
+};
 const _FinancialTransactiontypeEnumValueMap = {
   r'income': r'income',
   r'expense': r'expense',
@@ -615,6 +705,174 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'amountInLocalCurrency',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'amountInLocalCurrency',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'amountInLocalCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'amountInLocalCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'amountInLocalCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInLocalCurrencyBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'amountInLocalCurrency',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'amountInReferenceCurrency',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'amountInReferenceCurrency',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'amountInReferenceCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'amountInReferenceCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'amountInReferenceCurrency',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> amountInReferenceCurrencyBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'amountInReferenceCurrency',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
       QAfterFilterCondition> categoryIconCodeEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -865,6 +1123,162 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'currencyCode',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currencyCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+          QAfterFilterCondition>
+      currencyCodeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'currencyCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+          QAfterFilterCondition>
+      currencyCodeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'currencyCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> currencyCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'currencyCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
       QAfterFilterCondition> dateEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -916,6 +1330,258 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'exchangeRateAtTime',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'exchangeRateAtTime',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'exchangeRateAtTime',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'exchangeRateAtTime',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'exchangeRateAtTime',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> exchangeRateAtTimeBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'exchangeRateAtTime',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'fixedLocalPortion',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'fixedLocalPortion',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fixedLocalPortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'fixedLocalPortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'fixedLocalPortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedLocalPortionBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'fixedLocalPortion',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'fixedReferencePortion',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'fixedReferencePortion',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fixedReferencePortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'fixedReferencePortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'fixedReferencePortion',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> fixedReferencePortionBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'fixedReferencePortion',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }
@@ -1199,6 +1865,162 @@ extension FinancialTransactionQueryFilter on QueryBuilder<FinancialTransaction,
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'paymentMode',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'paymentMode',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeEqualTo(
+    PaymentMode? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeGreaterThan(
+    PaymentMode? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeLessThan(
+    PaymentMode? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeBetween(
+    PaymentMode? lower,
+    PaymentMode? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'paymentMode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+          QAfterFilterCondition>
+      paymentModeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'paymentMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+          QAfterFilterCondition>
+      paymentModeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'paymentMode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'paymentMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
+      QAfterFilterCondition> paymentModeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'paymentMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction,
       QAfterFilterCondition> typeEqualTo(
     TransactionType value, {
     bool caseSensitive = true,
@@ -1402,6 +2224,34 @@ extension FinancialTransactionQuerySortBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByAmountInLocalCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInLocalCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByAmountInLocalCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInLocalCurrency', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByAmountInReferenceCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInReferenceCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByAmountInReferenceCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInReferenceCurrency', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       sortByCategoryIconCode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'categoryIconCode', Sort.asc);
@@ -1444,6 +2294,20 @@ extension FinancialTransactionQuerySortBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       sortByDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.asc);
@@ -1454,6 +2318,48 @@ extension FinancialTransactionQuerySortBy
       sortByDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByExchangeRateAtTime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'exchangeRateAtTime', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByExchangeRateAtTimeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'exchangeRateAtTime', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByFixedLocalPortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedLocalPortion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByFixedLocalPortionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedLocalPortion', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByFixedReferencePortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedReferencePortion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByFixedReferencePortionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedReferencePortion', Sort.desc);
     });
   }
 
@@ -1500,6 +2406,20 @@ extension FinancialTransactionQuerySortBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByPaymentMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paymentMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      sortByPaymentModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paymentMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       sortByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1527,6 +2447,34 @@ extension FinancialTransactionQuerySortThenBy
       thenByAmountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'amount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByAmountInLocalCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInLocalCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByAmountInLocalCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInLocalCurrency', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByAmountInReferenceCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInReferenceCurrency', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByAmountInReferenceCurrencyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'amountInReferenceCurrency', Sort.desc);
     });
   }
 
@@ -1573,6 +2521,20 @@ extension FinancialTransactionQuerySortThenBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByCurrencyCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByCurrencyCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currencyCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       thenByDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.asc);
@@ -1583,6 +2545,48 @@ extension FinancialTransactionQuerySortThenBy
       thenByDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'date', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByExchangeRateAtTime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'exchangeRateAtTime', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByExchangeRateAtTimeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'exchangeRateAtTime', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByFixedLocalPortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedLocalPortion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByFixedLocalPortionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedLocalPortion', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByFixedReferencePortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedReferencePortion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByFixedReferencePortionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fixedReferencePortion', Sort.desc);
     });
   }
 
@@ -1643,6 +2647,20 @@ extension FinancialTransactionQuerySortThenBy
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByPaymentMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paymentMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
+      thenByPaymentModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paymentMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QAfterSortBy>
       thenByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1663,6 +2681,20 @@ extension FinancialTransactionQueryWhereDistinct
       distinctByAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'amount');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByAmountInLocalCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'amountInLocalCurrency');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByAmountInReferenceCurrency() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'amountInReferenceCurrency');
     });
   }
 
@@ -1688,9 +2720,37 @@ extension FinancialTransactionQueryWhereDistinct
   }
 
   QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByCurrencyCode({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currencyCode', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
       distinctByDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'date');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByExchangeRateAtTime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'exchangeRateAtTime');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByFixedLocalPortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'fixedLocalPortion');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByFixedReferencePortion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'fixedReferencePortion');
     });
   }
 
@@ -1712,6 +2772,13 @@ extension FinancialTransactionQueryWhereDistinct
       distinctByParentRecurringId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'parentRecurringId');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, FinancialTransaction, QDistinct>
+      distinctByPaymentMode({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'paymentMode', caseSensitive: caseSensitive);
     });
   }
 
@@ -1738,6 +2805,20 @@ extension FinancialTransactionQueryProperty on QueryBuilder<
     });
   }
 
+  QueryBuilder<FinancialTransaction, double?, QQueryOperations>
+      amountInLocalCurrencyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'amountInLocalCurrency');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, double?, QQueryOperations>
+      amountInReferenceCurrencyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'amountInReferenceCurrency');
+    });
+  }
+
   QueryBuilder<FinancialTransaction, int, QQueryOperations>
       categoryIconCodeProperty() {
     return QueryBuilder.apply(this, (query) {
@@ -1759,10 +2840,38 @@ extension FinancialTransactionQueryProperty on QueryBuilder<
     });
   }
 
+  QueryBuilder<FinancialTransaction, String?, QQueryOperations>
+      currencyCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currencyCode');
+    });
+  }
+
   QueryBuilder<FinancialTransaction, DateTime, QQueryOperations>
       dateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'date');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, double?, QQueryOperations>
+      exchangeRateAtTimeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'exchangeRateAtTime');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, double?, QQueryOperations>
+      fixedLocalPortionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'fixedLocalPortion');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, double?, QQueryOperations>
+      fixedReferencePortionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'fixedReferencePortion');
     });
   }
 
@@ -1783,6 +2892,13 @@ extension FinancialTransactionQueryProperty on QueryBuilder<
       parentRecurringIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'parentRecurringId');
+    });
+  }
+
+  QueryBuilder<FinancialTransaction, PaymentMode?, QQueryOperations>
+      paymentModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'paymentMode');
     });
   }
 

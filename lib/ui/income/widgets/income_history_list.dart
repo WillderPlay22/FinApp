@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/transaction.dart';
+import '../../../logic/providers/currency_providers.dart';
 import '../../shared/icon_mapper.dart';
+import '../../shared/currency_amount_display.dart';
 import '../../../logic/providers/database_providers.dart';
 
 class IncomeHistoryList extends ConsumerWidget {
@@ -90,9 +92,24 @@ class IncomeHistoryList extends ConsumerWidget {
                     DateFormat('dd MMM yyyy - hh:mm a', 'es').format(transaction.date),
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  trailing: Text(
-                    "+ \$${transaction.amount.toStringAsFixed(2)}",
-                    style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 16),
+                  trailing: Builder(
+                    builder: (context) {
+                      final isMultiCurrency = ref.watch(isMultiCurrencyEnabledProvider);
+                      if (isMultiCurrency && transaction.currencyCode != null) {
+                        return CurrencyAmountDisplay(
+                          amount: transaction.amount,
+                          currencyCode: transaction.currencyCode,
+                          textAlign: TextAlign.end,
+                          primaryStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 16),
+                          secondaryStyle: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          prefix: '+ ',
+                        );
+                      }
+                      return Text(
+                        "+ \$${transaction.amount.toStringAsFixed(2)}",
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 16),
+                      );
+                    },
                   ),
                 ),
               ),

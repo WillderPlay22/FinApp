@@ -22,11 +22,16 @@ class Expense {
 
   final category = IsarLink<Category>();
 
+  // --- MULTI-MONEDA ---
+  /// Código de moneda del monto (null = moneda de referencia para retrocompatibilidad).
+  String? currencyCode;
+
   Expense({
     required this.title,
     required this.amount,
     required this.date,
     this.isRecurring = false,
     this.frequency = Frequency.monthly, // Por defecto mensual
+    this.currencyCode,
   });
 }
